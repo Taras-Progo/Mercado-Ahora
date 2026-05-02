@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build output
+.next/
+out/
+dist/
+build/
+
+# Local tooling
+composer.phar
+composer-setup.php
+
+# Logs and caches
+*.log
+.DS_Store
+Thumbs.db
+
+Info (3).txt
+Logo - Mercado Ahora (1).png 
+Page Structure (1).txt 
+Chat (1).txt 
+page screen

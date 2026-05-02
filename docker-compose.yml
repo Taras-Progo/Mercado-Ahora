@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mercado_ahora_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mercado_ahora
+      POSTGRES_USER: mercado_ahora
+      POSTGRES_PASSWORD: mercado_ahora
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mercado_ahora -d mercado_ahora"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
