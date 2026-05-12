@@ -1,0 +1,41 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script_stop: true
+          script: |
+            export APP_DIR="${{ secrets.VPS_APP_DIR || '/opt/mercado-ahora' }}"
+            export REPO_URL="https://github.com/Taras-Progo/Mercado-Ahora.git"
+            export BRANCH="main"
+            export APP_URL="${{ secrets.APP_URL }}"
+            export APP_DOMAIN="${{ secrets.APP_DOMAIN }}"
+            export ACME_EMAIL="${{ secrets.ACME_EMAIL }}"
+
+            if [ ! -x "$(command -v docker)" ]; then
+              curl -fsSL https://raw.githubusercontent.com/Taras-Progo/Mercado-Ahora/main/deploy/provision-ubuntu.sh -o /tmp/provision-mercado.sh
+              bash /tmp/provision-mercado.sh
+            fi
+
+            mkdir -p "$APP_DIR"
+            if [ ! -d "$APP_DIR/.git" ]; then
+              git clone --branch "$BRANCH" "$REPO_URL" "$APP_DIR"
+            fi
+            cd "$APP_DIR"
+            git fetch origin "$BRANCH"
+            git reset --hard "origin/$BRANCH"
+            bash deploy/deploy.sh

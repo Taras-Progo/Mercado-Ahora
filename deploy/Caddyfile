@@ -1,0 +1,23 @@
+{
+    admin off
+}
+
+{$APP_DOMAIN::80} {
+    encode gzip zstd
+
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /storage/* {
+        reverse_proxy backend:8000
+    }
+
+    handle /up {
+        reverse_proxy backend:8000
+    }
+
+    handle {
+        reverse_proxy frontend:3000
+    }
+}
