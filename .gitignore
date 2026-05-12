@@ -22,6 +22,9 @@ composer-setup.php
 .DS_Store
 Thumbs.db
 
+# Document render QA artifacts
+docs/
+
 Info (3).txt
 Logo - Mercado Ahora (1).png 
 Page Structure (1).txt 
