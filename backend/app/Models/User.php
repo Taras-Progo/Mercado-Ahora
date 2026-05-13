@@ -47,7 +47,7 @@ class User extends Authenticatable
 
     public function isSeller(): bool
     {
-        return in_array($this->role, ['seller', 'admin'], true);
+        return $this->role === 'seller';
     }
 
     /**

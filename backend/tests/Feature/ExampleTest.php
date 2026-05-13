@@ -54,7 +54,8 @@ class ExampleTest extends TestCase
                 'quantity' => 2,
             ])
             ->assertCreated()
-            ->assertJsonPath('data.items.0.quantity', 2);
+            ->assertJsonPath('data.items.0.quantity', 2)
+            ->assertJsonPath('data.items.0.unit_price_cents_snapshot', $product->price_cents);
     }
 
     public function test_seller_can_access_dashboard(): void
@@ -150,5 +151,52 @@ class ExampleTest extends TestCase
             ->postJson('/api/v1/checkout/cart', ['delivery_type' => 'local'])
             ->assertCreated()
             ->assertJsonPath('data.orders_count', 2);
+    }
+
+    public function test_cart_and_checkout_keep_price_snapshot_when_product_price_changes(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'buyer@mercadoahora.test')->firstOrFail();
+        $product = Product::query()->firstOrFail();
+        $originalPrice = $product->price_cents;
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 2])
+            ->assertCreated()
+            ->assertJsonPath('data.items.0.unit_price_cents_snapshot', $originalPrice);
+
+        $product->update(['price_cents' => $originalPrice + 50000]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/cart/checkout-preview')
+            ->assertOk()
+            ->assertJsonPath('data.subtotal_cents', $originalPrice * 2);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/cart', ['delivery_type' => 'local'])
+            ->assertCreated()
+            ->assertJsonPath('data.orders.0.items.0.unit_price_cents', $originalPrice)
+            ->assertJsonPath('data.orders.0.items.0.line_total_cents', $originalPrice * 2);
+    }
+
+    public function test_admin_cannot_use_buyer_or_seller_marketplace_actions(): void
+    {
+        $this->seed();
+
+        $admin = User::query()->where('email', 'admin@mercadoahora.test')->firstOrFail();
+        $product = Product::query()->firstOrFail();
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertForbidden();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/seller/dashboard')
+            ->assertForbidden();
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/admin/users')
+            ->assertOk();
     }
 }

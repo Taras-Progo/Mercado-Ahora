@@ -168,7 +168,6 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $admin->cart()->firstOrCreate();
         $seller->cart()->firstOrCreate();
 
         User::query()->where('email', 'buyer@mercadoahora.test')->first()?->cart()->firstOrCreate();

@@ -22,10 +22,15 @@ class CartController extends Controller
             'note' => ['nullable', 'string'],
         ]);
 
-        Product::query()->where('status', 'active')->findOrFail($data['product_id']);
+        $product = Product::query()->where('status', 'active')->findOrFail($data['product_id']);
 
         $cart = $request->user()->cart()->firstOrCreate();
         $item = $cart->items()->firstOrNew(['product_id' => $data['product_id']]);
+        if (! $item->exists || $item->unit_price_cents_snapshot === null) {
+            $item->product_name_snapshot = $product->name;
+            $item->unit_price_cents_snapshot = $product->price_cents;
+            $item->currency_snapshot = $product->currency;
+        }
         $item->quantity = ($item->exists ? $item->quantity : 0) + ($data['quantity'] ?? 1);
         $item->note = $data['note'] ?? $item->note;
         $item->save();
@@ -73,7 +78,7 @@ class CartController extends Controller
 
     private function summary($cart): array
     {
-        $subtotal = $cart->items->sum(fn ($item) => $item->quantity * $item->product->price_cents);
+        $subtotal = $cart->items->sum(fn ($item) => $item->quantity * $this->unitPriceSnapshot($item));
 
         return [
             'cart' => $cart,
@@ -81,5 +86,10 @@ class CartController extends Controller
             'delivery_cents' => 0,
             'total_cents' => $subtotal,
         ];
+    }
+
+    private function unitPriceSnapshot($item): int
+    {
+        return $item->unit_price_cents_snapshot ?? $item->product->price_cents;
     }
 }

@@ -37,30 +37,32 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/users/me', [AuthController::class, 'me']);
 
-        Route::get('/cart', [CartController::class, 'show']);
-        Route::post('/cart/items', [CartController::class, 'addItem']);
-        Route::patch('/cart/items/{id}', [CartController::class, 'updateItem']);
-        Route::delete('/cart/items/{id}', [CartController::class, 'removeItem']);
-        Route::patch('/cart/delivery', [CartController::class, 'delivery']);
-        Route::post('/cart/coupon', fn () => response()->json(['data' => ['message' => 'Cupones quedan para fase futura.']]));
-        Route::post('/cart/checkout-preview', [CartController::class, 'preview']);
+        Route::middleware('role:buyer,seller')->group(function () {
+            Route::get('/cart', [CartController::class, 'show']);
+            Route::post('/cart/items', [CartController::class, 'addItem']);
+            Route::patch('/cart/items/{id}', [CartController::class, 'updateItem']);
+            Route::delete('/cart/items/{id}', [CartController::class, 'removeItem']);
+            Route::patch('/cart/delivery', [CartController::class, 'delivery']);
+            Route::post('/cart/coupon', fn () => response()->json(['data' => ['message' => 'Cupones quedan para fase futura.']]));
+            Route::post('/cart/checkout-preview', [CartController::class, 'preview']);
 
-        Route::post('/checkout/buy-now', [OrderController::class, 'buyNow']);
-        Route::post('/checkout/cart', [OrderController::class, 'checkoutCart']);
-        Route::get('/orders', [OrderController::class, 'buyerOrders']);
-        Route::get('/orders/{id}', [OrderController::class, 'show']);
-        Route::get('/orders/{id}/tracking', [OrderController::class, 'tracking']);
-        Route::post('/orders/{id}/returns', [OrderController::class, 'requestReturn']);
-        Route::get('/returns', [OrderController::class, 'returns']);
-        Route::post('/orders/{id}/payment-intent', [OrderController::class, 'createPaymentIntent']);
-        Route::get('/orders/{id}/payment', [OrderController::class, 'paymentStatus']);
+            Route::post('/checkout/buy-now', [OrderController::class, 'buyNow']);
+            Route::post('/checkout/cart', [OrderController::class, 'checkoutCart']);
+            Route::get('/orders', [OrderController::class, 'buyerOrders']);
+            Route::get('/orders/{id}', [OrderController::class, 'show']);
+            Route::get('/orders/{id}/tracking', [OrderController::class, 'tracking']);
+            Route::post('/orders/{id}/returns', [OrderController::class, 'requestReturn']);
+            Route::get('/returns', [OrderController::class, 'returns']);
+            Route::post('/orders/{id}/payment-intent', [OrderController::class, 'createPaymentIntent']);
+            Route::get('/orders/{id}/payment', [OrderController::class, 'paymentStatus']);
 
-        Route::get('/conversations', [ChatController::class, 'index']);
-        Route::post('/conversations', [ChatController::class, 'store']);
-        Route::get('/conversations/{id}', [ChatController::class, 'show']);
-        Route::get('/conversations/{id}/messages', [ChatController::class, 'messages']);
-        Route::post('/conversations/{id}/messages', [ChatController::class, 'send']);
-        Route::post('/conversations/{id}/stock-question', [ChatController::class, 'stockQuestion']);
+            Route::get('/conversations', [ChatController::class, 'index']);
+            Route::post('/conversations', [ChatController::class, 'store']);
+            Route::get('/conversations/{id}', [ChatController::class, 'show']);
+            Route::get('/conversations/{id}/messages', [ChatController::class, 'messages']);
+            Route::post('/conversations/{id}/messages', [ChatController::class, 'send']);
+            Route::post('/conversations/{id}/stock-question', [ChatController::class, 'stockQuestion']);
+        });
 
         Route::middleware('role:seller')->group(function () {
             Route::get('/seller/profile', [SellerController::class, 'profile']);

@@ -28,7 +28,7 @@ class OrderController extends Controller
         $product = Product::query()->where('status', 'active')->findOrFail($data['product_id']);
 
         return response()->json([
-            'data' => $this->createOrder($request, [[$product, $data['quantity'] ?? 1]], $data),
+            'data' => $this->createOrder($request, [$this->orderItemFromProduct($product, $data['quantity'] ?? 1)], $data),
         ], 201);
     }
 
@@ -48,7 +48,12 @@ class OrderController extends Controller
             abort(422, 'El carrito está vacío.');
         }
 
-        $items = $cart->items->map(fn ($item) => [$item->product, $item->quantity])->all();
+        $items = $cart->items->map(fn ($item) => [
+            'product' => $item->product,
+            'quantity' => $item->quantity,
+            'product_name' => $item->product_name_snapshot ?? $item->product->name,
+            'unit_price_cents' => $item->unit_price_cents_snapshot ?? $item->product->price_cents,
+        ])->all();
         $orders = $this->createGroupedOrders($request, $items, $data + ['delivery_type' => $cart->delivery_type]);
         $cart->items()->delete();
 
@@ -191,7 +196,7 @@ class OrderController extends Controller
     private function createOrder(Request $request, array $items, array $data): Order
     {
         return DB::transaction(function () use ($request, $items, $data) {
-            $subtotal = collect($items)->sum(fn ($item) => $item[0]->price_cents * $item[1]);
+            $subtotal = collect($items)->sum(fn ($item) => $item['unit_price_cents'] * $item['quantity']);
 
             $order = Order::query()->create([
                 'buyer_id' => $request->user()->id,
@@ -208,14 +213,18 @@ class OrderController extends Controller
                 'buyer_note' => $data['buyer_note'] ?? null,
             ]);
 
-            foreach ($items as [$product, $quantity]) {
+            foreach ($items as $item) {
+                $product = $item['product'];
+                $quantity = $item['quantity'];
+                $unitPrice = $item['unit_price_cents'];
+
                 $order->items()->create([
                     'product_id' => $product->id,
                     'producer_profile_id' => $product->producer_profile_id,
-                    'product_name' => $product->name,
-                    'unit_price_cents' => $product->price_cents,
+                    'product_name' => $item['product_name'],
+                    'unit_price_cents' => $unitPrice,
                     'quantity' => $quantity,
-                    'line_total_cents' => $product->price_cents * $quantity,
+                    'line_total_cents' => $unitPrice * $quantity,
                 ]);
             }
 
@@ -231,7 +240,7 @@ class OrderController extends Controller
 
     private function createGroupedOrders(Request $request, array $items, array $data): array
     {
-        $groups = collect($items)->groupBy(fn ($item) => $item[0]->producer_profile_id);
+        $groups = collect($items)->groupBy(fn ($item) => $item['product']->producer_profile_id);
 
         return DB::transaction(function () use ($request, $groups, $data) {
             return $groups
@@ -239,5 +248,15 @@ class OrderController extends Controller
                 ->values()
                 ->all();
         });
+    }
+
+    private function orderItemFromProduct(Product $product, int $quantity): array
+    {
+        return [
+            'product' => $product,
+            'quantity' => $quantity,
+            'product_name' => $product->name,
+            'unit_price_cents' => $product->price_cents,
+        ];
     }
 }

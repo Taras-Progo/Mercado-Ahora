@@ -103,7 +103,7 @@ class ChatController extends Controller
     {
         $conversation = Conversation::query()->with('producerProfile')->findOrFail($id);
 
-        if ($conversation->buyer_id !== $request->user()->id && $conversation->producerProfile->user_id !== $request->user()->id && ! $request->user()->isAdmin()) {
+        if ($conversation->buyer_id !== $request->user()->id && $conversation->producerProfile->user_id !== $request->user()->id) {
             abort(403);
         }
 

@@ -16,7 +16,7 @@ class EnsureRole
             abort(401, 'No autenticado.');
         }
 
-        if ($user->role === 'admin' || in_array($user->role, $roles, true)) {
+        if (in_array($user->role, $roles, true)) {
             return $next($request);
         }
 
