@@ -1,4 +1,4 @@
-import { AuthPanel } from "@/components/AuthPanel";
+import { AuthPanel, AuthPreparedFlows } from "@/components/AuthPanel";
 import { Header } from "@/components/Header";
 
 export default function LoginPage() {
@@ -11,6 +11,7 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-stone-600">Usa una cuenta registrada o el usuario demo del seed.</p>
         </div>
         <AuthPanel mode="login" />
+        <AuthPreparedFlows />
       </main>
     </>
   );

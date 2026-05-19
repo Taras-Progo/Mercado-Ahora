@@ -1,16 +1,21 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { roleHome, useAuth } from "@/components/AuthProvider";
 
-const navItems = [
-  ["Catálogo", "/"],
-  ["Carrito", "/cart"],
-  ["Pedidos", "/orders"],
-  ["Chat", "/chat"],
-  ["Vendedor", "/seller"],
-  ["Admin", "/admin"],
-];
+const publicNavItems = [["Catalogo", "/"]];
 
 export function Header() {
+  const { loading, logout, user } = useAuth();
+  const navItems = [
+    ...publicNavItems,
+    ...(user?.role === "buyer" || user?.role === "seller" ? [["Carrito", "/cart"], ["Pedidos", "/orders"], ["Chat", "/chat"]] : []),
+    ...(user?.role === "seller" ? [["Vendedor", "/seller"]] : []),
+    ...(user?.role === "admin" ? [["Admin", "/admin"]] : []),
+    ...(user ? [["Panel", roleHome(user.role)]] : []),
+  ];
+
   return (
     <header className="sticky top-0 z-20 border-b border-emerald-900/10 bg-white/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
@@ -29,12 +34,28 @@ export function Header() {
           ))}
         </nav>
         <div className="flex items-center gap-2">
-          <Link href="/login" className="rounded-md border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50">
-            Ingresar
-          </Link>
-          <Link href="/register" className="rounded-md bg-emerald-800 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-900">
-            Crear cuenta
-          </Link>
+          {loading ? (
+            <span className="text-sm text-stone-500">Sesion...</span>
+          ) : user ? (
+            <>
+              <span className="hidden text-sm font-medium text-stone-600 sm:inline">{user.name}</span>
+              <button
+                onClick={() => void logout()}
+                className="rounded-md border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50"
+              >
+                Salir
+              </button>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="rounded-md border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-900 hover:bg-emerald-50">
+                Ingresar
+              </Link>
+              <Link href="/register" className="rounded-md bg-emerald-800 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-900">
+                Crear cuenta
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </header>

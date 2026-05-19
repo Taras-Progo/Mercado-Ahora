@@ -1,4 +1,5 @@
 import { ApiPanel } from "@/components/ApiPanel";
+import { ProtectedArea } from "@/components/AuthProvider";
 import { Header } from "@/components/Header";
 
 export default function OrdersPage() {
@@ -10,7 +11,9 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold text-stone-950">Mis pedidos</h1>
           <p className="mt-1 text-sm text-stone-600">Seguimiento base de pedidos del comprador.</p>
         </div>
-        <ApiPanel title="Pedidos" endpoint="/orders" emptyText="Todavía no hay pedidos registrados." />
+        <ProtectedArea roles={["buyer", "seller"]}>
+          <ApiPanel title="Pedidos" endpoint="/orders" emptyText="Todavia no hay pedidos registrados." />
+        </ProtectedArea>
       </main>
     </>
   );

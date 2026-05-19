@@ -1,31 +1,31 @@
 "use client";
 
 import { useState } from "react";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
+import { parseApiMessage, useAuth } from "@/components/AuthProvider";
 
 export function ProductActions({ productId }: { productId: number }) {
   const [message, setMessage] = useState("");
+  const { authFetch, token, user } = useAuth();
 
   async function addToCart() {
-    const token = localStorage.getItem("mercado_token");
     if (!token) {
-      setMessage("Ingresá primero para agregar productos al carrito.");
+      setMessage("Ingresa primero para agregar productos al carrito.");
+      return;
+    }
+
+    if (user?.role === "admin") {
+      setMessage("Las cuentas admin no compran productos.");
       return;
     }
 
     try {
-      const response = await fetch(`${API_BASE}/cart/items`, {
+      const response = await authFetch("/cart/items", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ product_id: productId, quantity: 1 }),
       });
-      setMessage(response.ok ? "Producto agregado al carrito." : "No se pudo agregar el producto.");
+      setMessage(response.ok ? "Producto agregado al carrito." : await parseApiMessage(response));
     } catch {
-      setMessage("No se pudo conectar con la API local.");
+      setMessage("No se pudo conectar con la API.");
     }
   }
 

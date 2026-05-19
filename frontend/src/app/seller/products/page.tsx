@@ -1,4 +1,5 @@
 import { ApiPanel, SellerProductForm } from "@/components/ApiPanel";
+import { ProtectedArea } from "@/components/AuthProvider";
 import { Header } from "@/components/Header";
 
 export default function SellerProductsPage() {
@@ -10,8 +11,10 @@ export default function SellerProductsPage() {
           <h1 className="text-2xl font-bold text-stone-950">Productos del vendedor</h1>
           <p className="mt-1 text-sm text-stone-600">Alta y listado base. Los productos activos requieren productor aprobado.</p>
         </div>
-        <SellerProductForm />
-        <ApiPanel title="Mis productos" endpoint="/seller/products" emptyText="No hay productos creados." />
+        <ProtectedArea roles={["seller"]}>
+          <SellerProductForm />
+          <ApiPanel title="Mis productos" endpoint="/seller/products" emptyText="No hay productos creados." />
+        </ProtectedArea>
       </main>
     </>
   );

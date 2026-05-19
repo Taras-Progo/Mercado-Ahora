@@ -199,4 +199,128 @@ class ExampleTest extends TestCase
             ->getJson('/api/v1/admin/users')
             ->assertOk();
     }
+
+    public function test_buyer_registration_login_me_and_logout_flow(): void
+    {
+        $register = $this->postJson('/api/v1/auth/register', [
+            'name' => 'Comprador Nuevo',
+            'email' => 'new-buyer@example.com',
+            'password' => 'password123',
+        ])->assertCreated()
+            ->assertJsonPath('data.user.role', 'buyer');
+
+        $token = $register->json('data.token');
+
+        $this->withToken($token)
+            ->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('data.email', 'new-buyer@example.com')
+            ->assertJsonPath('data.role', 'buyer');
+
+        $this->withToken($token)
+            ->postJson('/api/v1/auth/logout')
+            ->assertOk();
+
+        $login = $this->postJson('/api/v1/auth/login', [
+            'email' => 'new-buyer@example.com',
+            'password' => 'password123',
+        ])->assertOk();
+
+        $this->withToken($login->json('data.token'))
+            ->getJson('/api/v1/cart')
+            ->assertOk();
+    }
+
+    public function test_seller_registration_creates_pending_profile_and_admin_can_review_it(): void
+    {
+        $this->seed();
+
+        $sellerResponse = $this->postJson('/api/v1/auth/register-seller', [
+            'name' => 'Productor Nuevo',
+            'email' => 'new-seller@example.com',
+            'password' => 'password123',
+            'business_name' => 'Chacra Nueva',
+            'province' => 'Cordoba',
+            'city' => 'Alta Gracia',
+            'story' => 'Produccion familiar regional.',
+        ])->assertCreated()
+            ->assertJsonPath('data.user.role', 'seller')
+            ->assertJsonPath('data.user.producer_profile.status', 'pending');
+
+        $sellerToken = $sellerResponse->json('data.token');
+        $category = Category::query()->firstOrFail();
+
+        $this->withToken($sellerToken)
+            ->postJson('/api/v1/seller/products', [
+                'category_id' => $category->id,
+                'name' => 'Producto nuevo pendiente',
+                'price_cents' => 100000,
+                'stock' => 2,
+                'unit' => 'unidad',
+                'status' => 'active',
+            ])
+            ->assertForbidden();
+
+        $admin = User::query()->where('email', 'admin@mercadoahora.test')->firstOrFail();
+        $profile = ProducerProfile::query()->whereHas('user', fn ($query) => $query->where('email', 'new-seller@example.com'))->firstOrFail();
+
+        $this->actingAs($admin, 'sanctum')
+            ->patchJson("/api/v1/admin/producers/{$profile->id}/approve", ['approval_notes' => 'Aprobado para QA.'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'active');
+
+        $seller = User::query()->where('email', 'new-seller@example.com')->firstOrFail();
+
+        $this->actingAs($seller->refresh(), 'sanctum')
+            ->postJson('/api/v1/seller/products', [
+                'category_id' => $category->id,
+                'name' => 'Producto nuevo activo',
+                'price_cents' => 100000,
+                'stock' => 2,
+                'unit' => 'unidad',
+                'status' => 'active',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'active');
+    }
+
+    public function test_non_admin_and_non_seller_route_guards_are_enforced(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'buyer@mercadoahora.test')->firstOrFail();
+        $seller = User::query()->where('email', 'seller@mercadoahora.test')->firstOrFail();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/admin/users')
+            ->assertForbidden();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/seller/dashboard')
+            ->assertForbidden();
+
+        $this->actingAs($seller, 'sanctum')
+            ->getJson('/api/v1/admin/users')
+            ->assertForbidden();
+    }
+
+    public function test_email_verification_and_password_reset_placeholders_are_available(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'buyer@mercadoahora.test')->firstOrFail();
+
+        $this->postJson('/api/v1/auth/password/forgot', ['email' => $buyer->email])
+            ->assertOk()
+            ->assertJsonPath('data.message', 'Flujo preparado para Fase 1.');
+
+        $this->postJson('/api/v1/auth/password/reset', ['email' => $buyer->email])
+            ->assertOk()
+            ->assertJsonPath('data.message', 'Flujo preparado para Fase 1.');
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/auth/email/verify')
+            ->assertOk()
+            ->assertJsonPath('data.message', 'Verificación preparada.');
+    }
 }

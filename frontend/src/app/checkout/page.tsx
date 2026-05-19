@@ -1,4 +1,5 @@
 import { ApiPanel } from "@/components/ApiPanel";
+import { ProtectedArea } from "@/components/AuthProvider";
 import { Header } from "@/components/Header";
 
 export default function CheckoutPage() {
@@ -10,7 +11,9 @@ export default function CheckoutPage() {
           <h1 className="text-2xl font-bold text-stone-950">Checkout</h1>
           <p className="mt-1 text-sm text-stone-600">La estructura de pago queda preparada; Mercado Pago se integra en una fase futura.</p>
         </div>
-        <ApiPanel title="Resumen de checkout" endpoint="/cart" emptyText="Agregá productos antes de confirmar el pedido." />
+        <ProtectedArea roles={["buyer", "seller"]}>
+          <ApiPanel title="Resumen de checkout" endpoint="/cart" emptyText="Agrega productos antes de confirmar el pedido." />
+        </ProtectedArea>
       </main>
     </>
   );

@@ -14,7 +14,7 @@ class SellerController extends Controller
     public function profile(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => $request->user()->producerProfile,
+            'data' => $request->user()->producerProfile()->first(),
         ]);
     }
 
@@ -48,7 +48,7 @@ class SellerController extends Controller
 
     public function dashboard(Request $request): JsonResponse
     {
-        $profile = $request->user()->producerProfile;
+        $profile = $request->user()->producerProfile()->first();
 
         return response()->json([
             'data' => [
@@ -167,7 +167,7 @@ class SellerController extends Controller
 
     private function profileOrFail(Request $request)
     {
-        return $request->user()->producerProfile ?? abort(422, 'Primero debe crear el perfil de productor.');
+        return $request->user()->producerProfile()->first() ?? abort(422, 'Primero debe crear el perfil de productor.');
     }
 
     private function ensureCanUseProductStatus($profile, string $status): void
