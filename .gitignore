@@ -23,7 +23,7 @@ composer-setup.php
 Thumbs.db
 
 # Document render QA artifacts
-docs/
+docs/architecture/docx-render/
 
 Info (3).txt
 Logo - Mercado Ahora (1).png 
