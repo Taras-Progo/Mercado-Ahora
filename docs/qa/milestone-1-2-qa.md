@@ -33,13 +33,17 @@ This QA note only covers Milestone 1 and Milestone 2.
 - Authenticated frontend calls include the bearer token.
 - Backend role middleware protects buyer/seller/admin route groups.
 - Admin is not allowed to act as buyer or seller.
-- Seller-only frontend pages are protected.
-- Admin frontend area is protected.
+- Seller-only frontend pages are protected by `<RoleGuard roles={["seller"]}>` and unauthorized users are redirected to login.
+- Admin frontend area is protected by `<RoleGuard roles={["admin"]}>`.
 - Buyer/seller marketplace areas are protected.
-- Admin can approve or reject producer profiles.
+- Admin can approve or reject producer profiles from the new `/admin` UI.
 - Pending seller cannot publish active products.
+- Producer status (pending / approved / rejected) is read from the user object returned by `/auth/me` and surfaced as a banner on the seller dashboard.
 - Email verification endpoint is present as a prepared placeholder.
 - Password reset endpoints are present as prepared placeholders.
+- Frontend `/recuperar` page calls the password-reset placeholder endpoint and informs the user that real email delivery is a later milestone.
+- Frontend `/verificar-email` page documents the prepared verification flow.
+- Authenticated dashboards show a dismissible "Verificá tu email" banner when `email_verified_at` is null, with a one-click resend that hits the prepared backend endpoint.
 
 ## Automated Verification
 
@@ -50,21 +54,26 @@ This QA note only covers Milestone 1 and Milestone 2.
 
 ## Manual QA Checklist
 
-- Buyer can register from frontend.
-- Buyer can log in from frontend.
-- Buyer remains logged in after page refresh.
+- Buyer can register from frontend (`/register`).
+- Buyer can log in from frontend (`/login`).
+- Buyer remains logged in after page refresh (token + `/auth/me`).
 - Buyer can access buyer areas such as cart and orders.
-- Seller can submit producer postulation from frontend.
+- Seller can submit producer postulation from frontend (`/seller/apply`).
 - Seller remains logged in after postulation.
-- Seller can access seller dashboard.
+- Seller can access seller dashboard (`/seller`, role-guarded).
 - Seller dashboard shows pending approval state when profile is pending.
+- Seller dashboard shows rejected state when profile is rejected.
 - Pending seller cannot publish active products.
 - Admin can log in from frontend.
-- Admin can access admin page.
-- Admin can approve producer profile.
-- Admin can reject producer profile.
-- Non-admin account sees blocked state on admin page.
-- Non-seller account sees blocked state on seller pages.
+- Admin can access admin page (`/admin`, role-guarded).
+- Admin can approve producer profile from the admin UI.
+- Admin can reject producer profile from the admin UI.
+- Non-admin account is redirected to its own home when hitting `/admin`.
+- Non-seller account is redirected to its own home when hitting `/seller`.
+- Unauthenticated user hitting `/seller` or `/admin` is redirected to `/login?redirect=...`.
+- `/recuperar` page accepts an email and shows the prepared-placeholder success message.
+- `/verificar-email` page is reachable and links from authenticated dashboards via the banner.
+- "Verificá tu email" banner is dismissible and only appears when `email_verified_at` is null.
 - Logout clears the local session and removes role navigation.
 
 ## Known Milestone 2 Boundaries

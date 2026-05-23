@@ -1,20 +1,22 @@
-import { ApiPanel } from "@/components/ApiPanel";
-import { ProtectedArea } from "@/components/AuthProvider";
-import { Header } from "@/components/Header";
+import { PagePlaceholder } from "@/components/layout/PagePlaceholder";
+import { SiteFooter } from "@/components/layout/SiteFooter";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export default function OrdersPage() {
   return (
     <>
-      <Header />
-      <main className="mx-auto grid max-w-5xl gap-5 px-4 py-8 sm:px-6">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-950">Mis pedidos</h1>
-          <p className="mt-1 text-sm text-stone-600">Seguimiento base de pedidos del comprador.</p>
+      <SiteHeader />
+      <main className="bg-background py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
+          <PagePlaceholder
+            eyebrow="Próximamente"
+            title="Mis pedidos"
+            description="El historial completo y el seguimiento de pedidos se entregan en Milestone 5 (Pedidos, devoluciones, admin y entrega del MVP)."
+            cta={{ label: "Volver al inicio", href: "/" }}
+          />
         </div>
-        <ProtectedArea roles={["buyer", "seller"]}>
-          <ApiPanel title="Pedidos" endpoint="/orders" emptyText="Todavia no hay pedidos registrados." />
-        </ProtectedArea>
       </main>
+      <SiteFooter />
     </>
   );
 }

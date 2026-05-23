@@ -1,20 +1,22 @@
-import { ApiPanel } from "@/components/ApiPanel";
-import { ProtectedArea } from "@/components/AuthProvider";
-import { Header } from "@/components/Header";
+import { PagePlaceholder } from "@/components/layout/PagePlaceholder";
+import { SiteFooter } from "@/components/layout/SiteFooter";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export default function ChatPage() {
   return (
     <>
-      <Header />
-      <main className="mx-auto grid max-w-5xl gap-5 px-4 py-8 sm:px-6">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-950">Chat basico</h1>
-          <p className="mt-1 text-sm text-stone-600">Phase 1 usa actualizacion ligera. Ofertas y contraofertas quedan preparadas para futuro.</p>
+      <SiteHeader />
+      <main className="bg-background py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
+          <PagePlaceholder
+            eyebrow="Próximamente"
+            title="Chat con productores"
+            description="El chat híbrido con consulta, oferta y compra se entrega en Milestone 4. La estructura base de conversaciones ya está disponible en la API."
+            cta={{ label: "Volver al inicio", href: "/" }}
+          />
         </div>
-        <ProtectedArea roles={["buyer", "seller"]}>
-          <ApiPanel title="Conversaciones" endpoint="/conversations" emptyText="No hay conversaciones todavia." />
-        </ProtectedArea>
       </main>
+      <SiteFooter />
     </>
   );
 }

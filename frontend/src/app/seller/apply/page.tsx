@@ -1,19 +1,14 @@
-import { SellerApplicationForm } from "@/components/ApiPanel";
-import { Header } from "@/components/Header";
+import { AuthFooterLinks, AuthPanel } from "@/components/AuthPanel";
+import { AuthLayout } from "@/components/layout/AuthLayout";
 
 export default function SellerApplyPage() {
   return (
-    <>
-      <Header />
-      <main className="mx-auto grid max-w-4xl gap-5 px-4 py-8 sm:px-6">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-950">Postulación de productor</h1>
-          <p className="mt-1 text-sm text-stone-600">
-            El productor queda en estado pending hasta que administración revise su historia, producción y presencia digital.
-          </p>
-        </div>
-        <SellerApplicationForm />
-      </main>
-    </>
+    <AuthLayout
+      title="Postular como productor"
+      subtitle="Contanos quién sos y qué producís. Un administrador revisará tu postulación antes de habilitarte a publicar."
+      footer={<AuthFooterLinks mode="seller-apply" />}
+    >
+      <AuthPanel mode="seller-apply" />
+    </AuthLayout>
   );
 }

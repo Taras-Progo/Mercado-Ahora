@@ -1,20 +1,22 @@
-import { ApiPanel } from "@/components/ApiPanel";
-import { ProtectedArea } from "@/components/AuthProvider";
-import { Header } from "@/components/Header";
+import { PagePlaceholder } from "@/components/layout/PagePlaceholder";
+import { SiteFooter } from "@/components/layout/SiteFooter";
+import { SiteHeader } from "@/components/layout/SiteHeader";
 
 export default function CheckoutPage() {
   return (
     <>
-      <Header />
-      <main className="mx-auto grid max-w-5xl gap-5 px-4 py-8 sm:px-6">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-950">Checkout</h1>
-          <p className="mt-1 text-sm text-stone-600">La estructura de pago queda preparada; Mercado Pago se integra en una fase futura.</p>
+      <SiteHeader />
+      <main className="bg-background py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
+          <PagePlaceholder
+            eyebrow="Próximamente"
+            title="Checkout"
+            description="El flujo de pago queda preparado estructuralmente en Fase 1; la integración completa con Mercado Pago corresponde a Milestone 5 y fases posteriores."
+            cta={{ label: "Volver al inicio", href: "/" }}
+          />
         </div>
-        <ProtectedArea roles={["buyer", "seller"]}>
-          <ApiPanel title="Resumen de checkout" endpoint="/cart" emptyText="Agrega productos antes de confirmar el pedido." />
-        </ProtectedArea>
       </main>
+      <SiteFooter />
     </>
   );
 }

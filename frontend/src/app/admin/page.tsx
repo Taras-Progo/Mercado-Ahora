@@ -1,20 +1,20 @@
-import { AdminReviewPanel } from "@/components/ApiPanel";
-import { ProtectedArea } from "@/components/AuthProvider";
-import { Header } from "@/components/Header";
+import { ProducerReview } from "@/components/admin/ProducerReview";
+import { SiteFooter } from "@/components/layout/SiteFooter";
+import { SiteHeader } from "@/components/layout/SiteHeader";
+import { RoleGuard } from "@/components/RoleGuard";
 
 export default function AdminPage() {
   return (
     <>
-      <Header />
-      <main className="mx-auto grid max-w-5xl gap-5 px-4 py-8 sm:px-6">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-950">Administracion</h1>
-          <p className="mt-1 text-sm text-stone-600">Revision de productores, productos y validacion manual de EcoScore.</p>
+      <SiteHeader variant="minimal" />
+      <main className="bg-background py-10">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-10">
+          <RoleGuard roles={["admin"]}>
+            <ProducerReview />
+          </RoleGuard>
         </div>
-        <ProtectedArea roles={["admin"]}>
-          <AdminReviewPanel />
-        </ProtectedArea>
       </main>
+      <SiteFooter />
     </>
   );
 }

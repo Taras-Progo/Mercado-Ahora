@@ -1,18 +1,15 @@
-import { AuthPanel, AuthPreparedFlows } from "@/components/AuthPanel";
-import { Header } from "@/components/Header";
+import { AuthFooterLinks, AuthPanel, AuthPreparedFlows } from "@/components/AuthPanel";
+import { AuthLayout } from "@/components/layout/AuthLayout";
 
 export default function LoginPage() {
   return (
-    <>
-      <Header />
-      <main className="mx-auto grid max-w-md gap-5 px-4 py-10">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-950">Ingresar</h1>
-          <p className="mt-1 text-sm text-stone-600">Usa una cuenta registrada o el usuario demo del seed.</p>
-        </div>
-        <AuthPanel mode="login" />
-        <AuthPreparedFlows />
-      </main>
-    </>
+    <AuthLayout
+      title="Ingresar"
+      subtitle="Usá tu cuenta para acceder al marketplace y conectar con productores locales."
+      footer={<AuthFooterLinks mode="login" />}
+    >
+      <AuthPanel mode="login" />
+      <AuthPreparedFlows />
+    </AuthLayout>
   );
 }

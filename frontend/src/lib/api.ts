@@ -12,15 +12,7 @@ export type ProducerProfile = {
   province?: string;
   city?: string;
   description?: string;
-  production_origin?: string;
-  product_types?: string;
-  production_method?: string;
-  production_since?: string;
-  story?: string;
-  digital_presence_notes?: string;
   status?: string;
-  social_links?: Array<{ id: number; platform: string; url: string; is_visible: boolean }>;
-  socialLinks?: Array<{ id: number; platform: string; url: string; is_visible: boolean }>;
 };
 
 export type Product = {
@@ -37,8 +29,6 @@ export type Product = {
   production_type?: string;
   delivery_type?: string;
   ecoscore_points?: number;
-  ecoscore_status?: string;
-  ecoscore_validation_notes?: string;
   status?: string;
   category?: Category;
   producer_profile?: ProducerProfile;
@@ -89,9 +79,7 @@ export const demoProducts: Product[] = [
     delivery_type: "local",
     ecoscore_points: 90,
     category: demoCategories[0],
-    ecoscore_status: "manual_reviewed",
-    ecoscore_validation_notes: "Validación demo por revisión manual.",
-    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia", story: "Emprendimiento familiar enfocado en productos naturales y procesos transparentes.", status: "active" },
+    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
   },
   {
     id: 2,
@@ -108,9 +96,7 @@ export const demoProducts: Product[] = [
     delivery_type: "local",
     ecoscore_points: 78,
     category: demoCategories[2],
-    ecoscore_status: "manual_reviewed",
-    ecoscore_validation_notes: "Validación demo por revisión manual.",
-    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia", story: "Emprendimiento familiar enfocado en productos naturales y procesos transparentes.", status: "active" },
+    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
   },
   {
     id: 3,
@@ -127,9 +113,7 @@ export const demoProducts: Product[] = [
     delivery_type: "home_delivery",
     ecoscore_points: 84,
     category: demoCategories[3],
-    ecoscore_status: "manual_reviewed",
-    ecoscore_validation_notes: "Validación demo por revisión manual.",
-    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia", story: "Emprendimiento familiar enfocado en productos naturales y procesos transparentes.", status: "active" },
+    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
   },
 ];
 

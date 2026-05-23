@@ -1,21 +1,25 @@
-import { ApiPanel } from "@/components/ApiPanel";
-import { ProtectedArea } from "@/components/AuthProvider";
-import { Header } from "@/components/Header";
+import { PagePlaceholder } from "@/components/layout/PagePlaceholder";
+import { SiteFooter } from "@/components/layout/SiteFooter";
+import { SiteHeader } from "@/components/layout/SiteHeader";
+import { RoleGuard } from "@/components/RoleGuard";
 
 export default function SellerProfilePage() {
   return (
     <>
-      <Header />
-      <main className="mx-auto grid max-w-5xl gap-5 px-4 py-8 sm:px-6">
-        <div>
-          <h1 className="text-2xl font-bold text-stone-950">Perfil de productor</h1>
-          <p className="mt-1 text-sm text-stone-600">Informacion publica del vendedor/productor.</p>
+      <SiteHeader variant="minimal" />
+      <main className="bg-background py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-10">
+          <RoleGuard roles={["seller"]}>
+            <PagePlaceholder
+              eyebrow="Perfil del productor"
+              title="Editar tu perfil público"
+              description="El perfil público completo con historia, fotos del proceso y galería se entrega en Milestone 3. En Milestone 2 ya guardamos los datos básicos durante la postulación."
+              cta={{ label: "Volver al panel", href: "/seller" }}
+            />
+          </RoleGuard>
         </div>
-        <ProtectedArea roles={["seller"]}>
-          <ApiPanel title="Perfil actual" endpoint="/seller/profile" emptyText="No hay perfil cargado." />
-          <ApiPanel title="Presencia digital preparada" endpoint="/seller/social-links" emptyText="No hay enlaces sociales cargados." />
-        </ProtectedArea>
       </main>
+      <SiteFooter />
     </>
   );
 }
