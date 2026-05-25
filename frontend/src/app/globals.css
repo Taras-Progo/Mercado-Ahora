@@ -1,16 +1,26 @@
 @import "tailwindcss";
 
 :root {
+  /* Page & surfaces — match client mock */
   --background: #fdfbf7;
-  --foreground: #2c2a26;
-  --cream: #f5f0e8;
-  --cream-card: #faf7f2;
-  --olive: #4a5d3f;
-  --olive-dark: #3d4f34;
-  --olive-light: #8ba07e;
-  --olive-muted: #e8efe4;
-  --gold-star: #e8b84a;
+  --foreground: #3c2f2f;
+  --cream: #f2ebe1;
+  --cream-card: #faf8f5;
   --border-soft: #e5dfd4;
+
+  /* Brand greens */
+  --olive: #4b5e40;
+  --olive-dark: #3d4f34;
+  --olive-light: #7a906e;
+  --olive-muted: #ebe8e3;
+  --accent-green: #7a906e;
+
+  /* Browns — icons & UI chrome */
+  --brown: #4a3728;
+  --brown-icon: #8b735b;
+  --brown-muted: #6b5a4a;
+
+  --gold-star: #e8b84a;
 }
 
 @theme inline {
@@ -22,6 +32,10 @@
   --color-olive-dark: var(--olive-dark);
   --color-olive-light: var(--olive-light);
   --color-olive-muted: var(--olive-muted);
+  --color-accent-green: var(--accent-green);
+  --color-brown: var(--brown);
+  --color-brown-icon: var(--brown-icon);
+  --color-brown-muted: var(--brown-muted);
   --color-border-soft: var(--border-soft);
   --font-sans: var(--font-inter), system-ui, sans-serif;
   --font-serif: var(--font-playfair), Georgia, serif;
@@ -41,17 +55,19 @@ body {
   font-family: var(--font-serif);
 }
 
-.hero-overlay {
-  background: linear-gradient(
-    90deg,
-    rgba(45, 58, 38, 0.82) 0%,
-    rgba(45, 58, 38, 0.55) 45%,
-    rgba(45, 58, 38, 0.25) 100%
-  );
+/* Primary CTA — olive button from mock */
+.btn-primary {
+  background-color: var(--olive);
+  color: #fff;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--olive-dark);
 }
 
 .card-shadow {
-  box-shadow: 0 1px 3px rgba(44, 42, 38, 0.06), 0 4px 12px rgba(44, 42, 38, 0.04);
+  box-shadow: 0 1px 3px rgba(60, 47, 47, 0.06), 0 4px 12px rgba(60, 47, 47, 0.04);
 }
 
 .scrollbar-hide {

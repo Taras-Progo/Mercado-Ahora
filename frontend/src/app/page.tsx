@@ -9,7 +9,7 @@ import { ValueBanner } from "@/components/layout/ValueBanner";
 export default function HomePage() {
   return (
     <>
-      <SiteHeader variant="transparent" />
+      <SiteHeader />
       <main>
         <HeroSection />
         <CategoriesGrid />

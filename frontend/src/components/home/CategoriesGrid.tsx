@@ -29,12 +29,12 @@ export function CategoriesGrid() {
           <Link
             key={category.slug}
             href={`/categorias/${category.slug}`}
-            className="group flex flex-col items-center gap-3 rounded-2xl border border-border-soft bg-cream-card px-3 py-6 text-center transition hover:-translate-y-1 hover:border-olive-light/50 hover:shadow-md"
+            className="group flex flex-col items-center gap-3 rounded-2xl border border-border-soft bg-cream-card px-3 py-6 text-center transition hover:-translate-y-1 hover:border-brown-icon/40 hover:shadow-md"
           >
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-olive transition group-hover:bg-olive group-hover:text-white">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full border border-brown-icon/35 bg-cream text-brown-icon transition group-hover:border-olive group-hover:bg-olive group-hover:text-white">
               <category.icon className="h-5 w-5" />
             </span>
-            <p className="text-xs font-medium leading-snug text-stone-700">{category.label}</p>
+            <p className="text-xs font-medium leading-snug text-brown">{category.label}</p>
           </Link>
         ))}
       </div>
@@ -56,13 +56,16 @@ export function SectionHeader({
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
       <div>
-        <h2 className="font-serif text-2xl font-bold text-stone-900 sm:text-3xl">{title}</h2>
-        {subtitle && <p className="mt-1 text-sm text-stone-600">{subtitle}</p>}
+        <h2 className="flex items-center gap-2 font-serif text-2xl font-bold text-foreground sm:text-3xl">
+          <LeafIcon className="h-5 w-5 text-accent-green" aria-hidden />
+          {title}
+        </h2>
+        {subtitle && <p className="mt-1 text-sm text-brown-muted">{subtitle}</p>}
       </div>
       {actionLabel && href && (
         <Link
           href={href}
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-olive-dark transition hover:text-olive"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-brown transition hover:text-olive-dark"
         >
           {actionLabel}
           <ChevronRightIcon className="h-4 w-4" />

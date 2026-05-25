@@ -53,15 +53,15 @@ export default function RegisterChooserPage() {
             className="group relative grid gap-3 rounded-2xl border-2 border-border-soft bg-white p-6 transition hover:-translate-y-0.5 hover:border-olive hover:shadow-lg"
           >
             <div className="flex items-start gap-4">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-olive-muted text-olive-dark transition group-hover:bg-olive group-hover:text-white">
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-brown-icon/30 bg-cream text-brown-icon transition group-hover:border-olive group-hover:bg-olive group-hover:text-white">
                 <role.icon className="h-6 w-6" />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-olive-dark">{role.badge}</p>
-                <h2 className="mt-0.5 font-serif text-xl font-bold text-stone-900">{role.title}</h2>
-                <p className="mt-1 text-sm leading-relaxed text-stone-600">{role.description}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-olive">{role.badge}</p>
+                <h2 className="mt-0.5 font-serif text-xl font-bold text-foreground">{role.title}</h2>
+                <p className="mt-1 text-sm leading-relaxed text-brown-muted">{role.description}</p>
               </div>
-              <ChevronRightIcon className="h-5 w-5 shrink-0 text-stone-400 transition group-hover:translate-x-0.5 group-hover:text-olive-dark" />
+              <ChevronRightIcon className="h-5 w-5 shrink-0 text-brown-icon transition group-hover:translate-x-0.5 group-hover:text-olive" />
             </div>
 
             <ul className="mt-1 grid gap-1.5 border-t border-border-soft pt-3 text-xs text-stone-600 sm:grid-cols-3">

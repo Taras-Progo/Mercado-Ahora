@@ -52,7 +52,7 @@ const featured: FeaturedProduct[] = [
 
 export function FeaturedProducts() {
   return (
-    <section className="bg-cream-card/60">
+    <section className="bg-background">
       <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-10">
         <SectionHeader title="Productos destacados" actionLabel="Ver todos" href="/productos" />
 
@@ -80,23 +80,23 @@ function ProductCard({ product }: { product: FeaturedProduct }) {
         <button
           type="button"
           aria-label="Agregar a favoritos"
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-stone-600 shadow-sm transition hover:bg-white hover:text-olive"
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-brown-icon shadow-sm transition hover:bg-white hover:text-olive"
         >
           <HeartIcon className="h-4 w-4" />
         </button>
       </div>
       <div className="grid gap-2 p-4">
-        <h3 className="line-clamp-1 text-sm font-semibold text-stone-900">{product.name}</h3>
-        <p className="text-xs text-stone-500">{product.description}</p>
-        <p className="text-lg font-bold text-olive-dark">{product.price}</p>
-        <div className="mt-1 flex items-center justify-between text-xs text-stone-500">
+        <h3 className="line-clamp-1 text-sm font-semibold text-foreground">{product.name}</h3>
+        <p className="text-xs text-brown-muted">{product.description}</p>
+        <p className="text-lg font-bold text-olive">{product.price}</p>
+        <div className="mt-1 flex items-center justify-between text-xs text-brown-muted">
           <span className="inline-flex items-center gap-1">
-            <MapPinIcon className="h-3.5 w-3.5" />
+            <MapPinIcon className="h-3.5 w-3.5 text-brown-icon" />
             {product.location}
           </span>
-          <span className="inline-flex items-center gap-1 font-medium text-stone-700">
+          <span className="inline-flex items-center gap-1 font-medium text-brown">
             <StarIcon className="h-3.5 w-3.5 text-amber-500" />
-            {product.rating.toFixed(1)} <span className="text-stone-400">({product.reviews})</span>
+            {product.rating.toFixed(1)} <span className="text-brown-muted/70">({product.reviews})</span>
           </span>
         </div>
       </div>

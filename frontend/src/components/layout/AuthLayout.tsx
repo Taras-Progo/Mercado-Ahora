@@ -36,7 +36,7 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
           <div className="relative grid gap-6">
             <h2 className="font-serif text-4xl leading-tight">
               Productos reales, <br />
-              <span className="text-[#c8d5b9]">productores reales.</span>
+              <span className="text-accent-green">productores reales.</span>
             </h2>
             <p className="max-w-md text-white/80">
               Sumate a una comunidad que valora lo local, lo artesanal y lo natural. Cada compra apoya a una persona y a una historia.
@@ -64,8 +64,8 @@ export function AuthLayout({ title, subtitle, children, footer }: AuthLayoutProp
               <Logo size="md" />
             </Link>
             <div className="mt-8 lg:mt-0">
-              <h1 className="font-serif text-3xl font-bold text-stone-900 sm:text-4xl">{title}</h1>
-              <p className="mt-3 text-sm leading-relaxed text-stone-600">{subtitle}</p>
+              <h1 className="font-serif text-3xl font-bold text-foreground sm:text-4xl">{title}</h1>
+              <p className="mt-3 text-sm leading-relaxed text-brown-muted">{subtitle}</p>
             </div>
             <div className="mt-8">{children}</div>
             {footer}

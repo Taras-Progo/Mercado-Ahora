@@ -28,9 +28,11 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const transparent = variant === "transparent";
   const baseClasses = transparent
     ? "absolute inset-x-0 top-0 z-30 border-b border-white/10 bg-transparent text-white"
-    : "sticky top-0 z-30 border-b border-border-soft bg-background/95 text-foreground backdrop-blur";
+    : "sticky top-0 z-30 border-b border-border-soft bg-background text-foreground";
 
-  const linkColor = transparent ? "text-white/90 hover:text-white" : "text-stone-700 hover:text-olive-dark";
+  const linkColor = transparent
+    ? "text-white/90 hover:text-white"
+    : "text-brown hover:text-olive-dark";
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
@@ -60,7 +62,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                   {active && (
                     <span
                       className={`absolute inset-x-3 -bottom-0.5 h-0.5 rounded-full ${
-                        transparent ? "bg-white" : "bg-olive"
+                        transparent ? "bg-white" : "bg-brown"
                       }`}
                     />
                   )}
@@ -95,7 +97,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                   transparent
                     ? "text-white hover:bg-white/10"
-                    : "text-olive-dark hover:bg-olive-muted"
+                    : "text-brown hover:bg-olive-muted"
                 }`}
               >
                 Ingresar
@@ -105,7 +107,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                 className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                   transparent
                     ? "bg-white text-olive-dark hover:bg-white/90"
-                    : "bg-olive text-white hover:bg-olive-dark"
+                    : "btn-primary"
                 }`}
               >
                 Crear cuenta
@@ -136,7 +138,7 @@ function IconButton({
       href={href}
       aria-label={ariaLabel}
       className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
-        transparent ? "text-white hover:bg-white/10" : "text-stone-700 hover:bg-olive-muted hover:text-olive-dark"
+        transparent ? "text-white hover:bg-white/10" : "text-brown-icon hover:bg-olive-muted hover:text-brown"
       }`}
     >
       {children}
@@ -177,10 +179,10 @@ function UserMenu({
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-olive text-xs font-bold text-white">
           {initials || "U"}
         </span>
-        <span className={`hidden text-sm font-semibold sm:inline ${transparent ? "text-white" : "text-stone-800"}`}>
+        <span className={`hidden text-sm font-semibold sm:inline ${transparent ? "text-white" : "text-brown"}`}>
           Mi cuenta
         </span>
-        <ChevronDownIcon className={`h-4 w-4 ${transparent ? "text-white" : "text-stone-500"}`} />
+        <ChevronDownIcon className={`h-4 w-4 ${transparent ? "text-white" : "text-brown-icon"}`} />
       </summary>
       <div className="absolute right-0 top-full mt-2 w-56 overflow-hidden rounded-2xl border border-border-soft bg-white shadow-lg">
         <div className="border-b border-border-soft bg-cream-card px-4 py-3">

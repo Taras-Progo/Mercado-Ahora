@@ -128,7 +128,7 @@ export function AuthPanel({ mode }: { mode: Mode }) {
       <button
         type="submit"
         disabled={loading}
-        className="mt-2 inline-flex items-center justify-center gap-2 rounded-full bg-olive-dark px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-primary mt-2 inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
       >
         {mode === "login" && "Ingresar"}
         {mode === "register" && "Crear cuenta"}

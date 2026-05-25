@@ -77,16 +77,16 @@ function ProducerCard({ producer }: { producer: Producer }) {
           <LeafIcon className="h-4 w-4" />
         </span>
       </div>
-      <h3 className="mt-4 font-serif text-lg font-semibold text-stone-900">{producer.name}</h3>
-      <p className="text-sm text-stone-500">{producer.specialty}</p>
-      <p className="mt-3 inline-flex items-center gap-1 text-xs text-stone-500">
-        <MapPinIcon className="h-3.5 w-3.5" />
+      <h3 className="mt-4 font-serif text-lg font-semibold text-foreground">{producer.name}</h3>
+      <p className="text-sm text-brown-muted">{producer.specialty}</p>
+      <p className="mt-3 inline-flex items-center gap-1 text-xs text-brown-muted">
+        <MapPinIcon className="h-3.5 w-3.5 text-brown-icon" />
         {producer.location}
       </p>
-      <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-stone-700">
+      <p className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-brown">
         <StarIcon className="h-4 w-4 text-amber-500" />
         {producer.rating.toFixed(1)}{" "}
-        <span className="font-normal text-stone-400">({producer.reviews})</span>
+        <span className="font-normal text-brown-muted/70">({producer.reviews})</span>
       </p>
     </article>
   );
