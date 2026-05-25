@@ -1,34 +1,35 @@
-import { LeafIcon } from "./Icons";
+import Image from "next/image";
 
 type LogoProps = {
   variant?: "dark" | "light";
   size?: "sm" | "md" | "lg";
+  className?: string;
 };
 
 const sizes = {
-  sm: { icon: "h-6 w-6", title: "text-base", subtitle: "text-[10px]" },
-  md: { icon: "h-7 w-7", title: "text-lg", subtitle: "text-[11px]" },
-  lg: { icon: "h-9 w-9", title: "text-xl", subtitle: "text-xs" },
+  sm: { className: "h-10 w-auto", width: 53, height: 40 },
+  md: { className: "h-14 w-auto", width: 75, height: 56 },
+  lg: { className: "h-20 w-auto", width: 107, height: 80 },
 };
 
-export function Logo({ variant = "dark", size = "md" }: LogoProps) {
+export function Logo({ variant = "dark", size = "md", className = "" }: LogoProps) {
   const s = sizes[size];
-  const textColor = variant === "light" ? "text-white" : "text-[#2c2a26]";
-  const accent = variant === "light" ? "text-[#c8d5b9]" : "text-olive";
+  // The PNG already has a fully styled mark (green badge, white text, leaves).
+  // `variant` is kept for API compatibility — on dark surfaces we add a soft
+  // glow shadow so the logo stays readable.
+  const dropShadow =
+    variant === "light"
+      ? "drop-shadow-[0_2px_6px_rgba(0,0,0,0.35)]"
+      : "";
 
   return (
-    <div className="flex items-center gap-2.5">
-      <span className={`flex items-center justify-center rounded-full bg-olive-muted ${s.icon} ${variant === "light" ? "bg-white/15" : ""}`}>
-        <LeafIcon className={`h-4 w-4 ${accent}`} />
-      </span>
-      <div className="leading-tight">
-        <p className={`font-serif font-bold tracking-tight ${s.title} ${textColor}`}>
-          Mercado <span className={accent}>AHORA</span>
-        </p>
-        <p className={`${s.subtitle} ${variant === "light" ? "text-white/70" : "text-stone-500"}`}>
-          Productos reales, productores reales
-        </p>
-      </div>
-    </div>
+    <Image
+      src="/brand/mercado-ahora-logo.png"
+      alt="Mercado Ahora"
+      width={s.width}
+      height={s.height}
+      priority
+      className={`${s.className} ${dropShadow} ${className}`.trim()}
+    />
   );
 }
