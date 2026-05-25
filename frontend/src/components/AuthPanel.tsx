@@ -196,20 +196,12 @@ export function AuthPreparedFlows() {
 export function AuthFooterLinks({ mode }: { mode: Mode }) {
   if (mode === "login") {
     return (
-      <div className="mt-6 grid gap-3 text-center text-sm text-stone-600">
-        <p>
-          ¿No tenés cuenta?{" "}
-          <Link href="/register" className="font-semibold text-olive-dark hover:text-olive">
-            Crear cuenta comprador
-          </Link>
-        </p>
-        <p>
-          ¿Sos productor o emprendedor?{" "}
-          <Link href="/seller/apply" className="font-semibold text-olive-dark hover:text-olive">
-            Postulate aquí
-          </Link>
-        </p>
-      </div>
+      <p className="mt-6 text-center text-sm text-stone-600">
+        ¿No tenés cuenta?{" "}
+        <Link href="/register" className="font-semibold text-olive-dark hover:text-olive">
+          Crear cuenta
+        </Link>
+      </p>
     );
   }
 
