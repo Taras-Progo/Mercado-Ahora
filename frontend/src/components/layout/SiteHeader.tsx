@@ -190,6 +190,11 @@ function UserMenu({
           <p className="text-xs capitalize text-stone-500">{role === "buyer" ? "Comprador" : role}</p>
         </div>
         <nav className="grid py-1 text-sm text-stone-700">
+          {role === "buyer" && (
+            <Link className="px-4 py-2 hover:bg-olive-muted" href="/cuenta">
+              Mi cuenta
+            </Link>
+          )}
           {role === "seller" && (
             <Link className="px-4 py-2 hover:bg-olive-muted" href="/seller">
               Panel del productor

@@ -125,6 +125,7 @@ export function useAuth() {
 export function roleHome(role: UserRole | undefined) {
   if (role === "admin") return "/admin";
   if (role === "seller") return "/seller";
+  if (role === "buyer") return "/cuenta";
   return "/";
 }
 
