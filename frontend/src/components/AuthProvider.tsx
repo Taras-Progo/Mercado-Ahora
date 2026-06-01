@@ -10,7 +10,7 @@ export type UserRole = "buyer" | "seller" | "admin";
 
 export type ProducerProfileSummary = {
   id: number;
-  status: "pending" | "approved" | "rejected";
+  status: "pending" | "active" | "rejected";
   business_name?: string;
 };
 

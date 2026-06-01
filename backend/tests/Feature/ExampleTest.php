@@ -41,7 +41,7 @@ class ExampleTest extends TestCase
         $this->seed();
 
         $login = $this->postJson('/api/v1/auth/login', [
-            'email' => 'buyer@mercadoahora.test',
+            'email' => 'maria@compradora.com',
             'password' => 'password',
         ])->assertOk();
 
@@ -62,7 +62,7 @@ class ExampleTest extends TestCase
     {
         $this->seed();
 
-        $seller = User::query()->where('email', 'seller@mercadoahora.test')->firstOrFail();
+        $seller = User::query()->where('email', 'verde@amanecer.com')->firstOrFail();
 
         $this->actingAs($seller, 'sanctum')
             ->getJson('/api/v1/seller/dashboard')
@@ -107,7 +107,7 @@ class ExampleTest extends TestCase
     {
         $this->seed();
 
-        $buyer = User::query()->where('email', 'buyer@mercadoahora.test')->firstOrFail();
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
         $category = Category::query()->firstOrFail();
 
         $seller = User::query()->create([
@@ -157,7 +157,7 @@ class ExampleTest extends TestCase
     {
         $this->seed();
 
-        $buyer = User::query()->where('email', 'buyer@mercadoahora.test')->firstOrFail();
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
         $product = Product::query()->firstOrFail();
         $originalPrice = $product->price_cents;
 
@@ -184,7 +184,7 @@ class ExampleTest extends TestCase
     {
         $this->seed();
 
-        $admin = User::query()->where('email', 'admin@mercadoahora.test')->firstOrFail();
+        $admin = User::query()->where('email', 'admin@mercadoahora.com')->firstOrFail();
         $product = Product::query()->firstOrFail();
 
         $this->actingAs($admin, 'sanctum')
@@ -261,7 +261,7 @@ class ExampleTest extends TestCase
             ])
             ->assertForbidden();
 
-        $admin = User::query()->where('email', 'admin@mercadoahora.test')->firstOrFail();
+        $admin = User::query()->where('email', 'admin@mercadoahora.com')->firstOrFail();
         $profile = ProducerProfile::query()->whereHas('user', fn ($query) => $query->where('email', 'new-seller@example.com'))->firstOrFail();
 
         $this->actingAs($admin, 'sanctum')
@@ -288,8 +288,8 @@ class ExampleTest extends TestCase
     {
         $this->seed();
 
-        $buyer = User::query()->where('email', 'buyer@mercadoahora.test')->firstOrFail();
-        $seller = User::query()->where('email', 'seller@mercadoahora.test')->firstOrFail();
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $seller = User::query()->where('email', 'verde@amanecer.com')->firstOrFail();
 
         $this->actingAs($buyer, 'sanctum')
             ->getJson('/api/v1/admin/users')
@@ -308,7 +308,7 @@ class ExampleTest extends TestCase
     {
         $this->seed();
 
-        $buyer = User::query()->where('email', 'buyer@mercadoahora.test')->firstOrFail();
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
 
         $this->postJson('/api/v1/auth/password/forgot', ['email' => $buyer->email])
             ->assertOk()

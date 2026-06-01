@@ -13,6 +13,14 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // Product/producer imagery comes from dynamic, user-uploaded or remote
+      // sources (Laravel storage, picsum, etc.) without configured next/image
+      // remote patterns, so plain <img> is used intentionally.
+      "@next/next/no-img-element": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

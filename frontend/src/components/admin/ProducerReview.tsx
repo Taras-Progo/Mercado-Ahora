@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
-import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -14,10 +13,12 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
 
+type ProducerStatus = "pending" | "active" | "rejected";
+
 type Producer = {
   id: number;
   business_name: string;
-  status: "pending" | "approved" | "rejected";
+  status: ProducerStatus;
   province?: string;
   city?: string;
   description?: string;
@@ -25,29 +26,29 @@ type Producer = {
   created_at?: string;
 };
 
-type StatusFilter = "all" | "pending" | "approved" | "rejected";
+type StatusFilter = "all" | "pending" | "active" | "rejected";
 
 const filters: { id: StatusFilter; label: string }[] = [
   { id: "all", label: "Todos" },
   { id: "pending", label: "Pendientes" },
-  { id: "approved", label: "Aprobados" },
+  { id: "active", label: "Aprobados" },
   { id: "rejected", label: "Rechazados" },
 ];
 
-const statusStyles: Record<Producer["status"], string> = {
+const statusStyles: Record<ProducerStatus, string> = {
   pending: "bg-amber-100 text-amber-800",
-  approved: "bg-emerald-100 text-emerald-800",
+  active: "bg-emerald-100 text-emerald-800",
   rejected: "bg-red-100 text-red-700",
 };
 
-const statusLabels: Record<Producer["status"], string> = {
+const statusLabels: Record<ProducerStatus, string> = {
   pending: "Pendiente",
-  approved: "Aprobado",
+  active: "Aprobado",
   rejected: "Rechazado",
 };
 
 export function ProducerReview() {
-  const { token, user } = useAuth();
+  const { token } = useAuth();
   const [producers, setProducers] = useState<Producer[]>([]);
   const [filter, setFilter] = useState<StatusFilter>("pending");
   const [search, setSearch] = useState("");
@@ -87,18 +88,30 @@ export function ProducerReview() {
     void load();
   }, [load]);
 
-  async function updateStatus(id: number, status: "approved" | "rejected") {
+  async function updateStatus(id: number, decision: "active" | "rejected") {
     if (!token) return;
+
+    // Use the dedicated approve/reject endpoints so the producer ends up with the
+    // canonical "active" status the rest of the app expects (publishing gate, etc).
+    let body: Record<string, string> = {};
+    let endpoint = `${API_BASE}/admin/producers/${id}/approve`;
+    if (decision === "rejected") {
+      const reason = window.prompt("Motivo del rechazo:", "No cumple los requisitos.");
+      if (reason === null) return;
+      endpoint = `${API_BASE}/admin/producers/${id}/reject`;
+      body = { rejection_reason: reason || "No cumple los requisitos." };
+    }
+
     setFeedback({ tone: "info", text: "Actualizando estado..." });
     try {
-      const response = await fetch(`${API_BASE}/admin/producers/${id}/status`, {
+      const response = await fetch(endpoint, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify(body),
       });
       if (!response.ok) {
         setFeedback({ tone: "error", text: "No se pudo actualizar el estado." });
@@ -106,7 +119,7 @@ export function ProducerReview() {
       }
       setFeedback({
         tone: "success",
-        text: status === "approved" ? "Productor aprobado." : "Productor rechazado.",
+        text: decision === "active" ? "Productor aprobado." : "Productor rechazado.",
       });
       await load();
     } catch {
@@ -128,27 +141,18 @@ export function ProducerReview() {
   const counts = {
     all: producers.length,
     pending: producers.filter((p) => p.status === "pending").length,
-    approved: producers.filter((p) => p.status === "approved").length,
+    active: producers.filter((p) => p.status === "active").length,
     rejected: producers.filter((p) => p.status === "rejected").length,
   };
 
   return (
     <div className="grid gap-6">
-      <header className="flex flex-col gap-1">
-        <h1 className="font-serif text-3xl font-bold text-stone-900">Panel administrador</h1>
-        <p className="text-sm text-stone-600">
-          Revisá y aprobá las postulaciones de productores para que puedan publicar en Mercado Ahora.
-        </p>
-      </header>
-
-      <EmailVerificationBanner email={user?.email} verified={Boolean(user?.email_verified_at)} />
-
       <div className="grid gap-3 sm:grid-cols-4">
         <StatTile label="Total" value={counts.all} icon={<LeafIcon className="h-4 w-4" />} />
         <StatTile label="Pendientes" value={counts.pending} icon={<ClockIcon className="h-4 w-4" />} accent="amber" />
         <StatTile
           label="Aprobados"
-          value={counts.approved}
+          value={counts.active}
           icon={<CheckCircleIcon className="h-4 w-4" />}
           accent="emerald"
         />
@@ -248,7 +252,7 @@ function ProducerCard({
   onUpdate,
 }: {
   producer: Producer;
-  onUpdate: (id: number, status: "approved" | "rejected") => void;
+  onUpdate: (id: number, status: "active" | "rejected") => void;
 }) {
   const initials = producer.business_name
     .split(" ")
@@ -295,7 +299,7 @@ function ProducerCard({
           </button>
           <button
             type="button"
-            onClick={() => onUpdate(producer.id, "approved")}
+            onClick={() => onUpdate(producer.id, "active")}
             className="inline-flex items-center gap-1.5 rounded-full bg-olive-dark px-4 py-2 text-xs font-semibold text-white transition hover:bg-olive"
           >
             <CheckCircleIcon className="h-4 w-4" />

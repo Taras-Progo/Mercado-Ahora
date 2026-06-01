@@ -28,13 +28,17 @@ class CatalogController extends Controller
         ]);
     }
 
-    public function products(Request $request): JsonResponse
+    public function products(Request $request, ?string $slug = null): JsonResponse
     {
+        // When reached via /categories/{slug}/products the category comes from the
+        // path; otherwise fall back to the ?category= query parameter.
+        $categorySlug = $slug ?? $request->query('category');
+
         $products = Product::query()
             ->with(['category', 'producerProfile', 'images'])
             ->where('status', 'active')
             ->when($request->query('q'), fn ($query, $q) => $query->where('name', 'like', "%{$q}%"))
-            ->when($request->query('category'), function ($query, $slug) {
+            ->when($categorySlug, function ($query, $slug) {
                 $query->whereHas('category', fn ($category) => $category->where('slug', $slug));
             })
             ->when($request->query('province'), fn ($query, $province) => $query->where('province', $province))
@@ -79,13 +83,20 @@ class CatalogController extends Controller
         ]);
     }
 
-    public function producers(): JsonResponse
+    public function producers(Request $request): JsonResponse
     {
         return response()->json([
             'data' => ProducerProfile::query()
                 ->with('socialLinks')
                 ->withCount('products')
                 ->where('status', 'active')
+                ->when($request->query('q'), function ($query, $q) {
+                    $query->where(function ($inner) use ($q) {
+                        $inner->where('business_name', 'like', "%{$q}%")
+                            ->orWhere('city', 'like', "%{$q}%")
+                            ->orWhere('province', 'like', "%{$q}%");
+                    });
+                })
                 ->orderBy('business_name')
                 ->get(),
         ]);

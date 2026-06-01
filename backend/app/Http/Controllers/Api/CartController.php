@@ -26,12 +26,18 @@ class CartController extends Controller
 
         $cart = $request->user()->cart()->firstOrCreate();
         $item = $cart->items()->firstOrNew(['product_id' => $data['product_id']]);
+        $requestedQuantity = ($item->exists ? $item->quantity : 0) + ($data['quantity'] ?? 1);
+
+        if ($product->stock !== null && $requestedQuantity > $product->stock) {
+            abort(422, "Stock insuficiente. Solo quedan {$product->stock} disponibles.");
+        }
+
         if (! $item->exists || $item->unit_price_cents_snapshot === null) {
             $item->product_name_snapshot = $product->name;
             $item->unit_price_cents_snapshot = $product->price_cents;
             $item->currency_snapshot = $product->currency;
         }
-        $item->quantity = ($item->exists ? $item->quantity : 0) + ($data['quantity'] ?? 1);
+        $item->quantity = $requestedQuantity;
         $item->note = $data['note'] ?? $item->note;
         $item->save();
 
@@ -46,6 +52,12 @@ class CartController extends Controller
         ]);
 
         $item = $request->user()->cart()->firstOrCreate()->items()->findOrFail($id);
+
+        $product = $item->product;
+        if ($product && $product->stock !== null && $data['quantity'] > $product->stock) {
+            abort(422, "Stock insuficiente. Solo quedan {$product->stock} disponibles.");
+        }
+
         $item->update($data);
 
         return response()->json(['data' => $this->cart($request)]);

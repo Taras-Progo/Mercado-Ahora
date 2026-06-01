@@ -66,7 +66,6 @@ function ProducerCard({ producer }: { producer: Producer }) {
   return (
     <article className="flex flex-col items-center rounded-2xl border border-border-soft bg-white p-6 text-center transition hover:shadow-lg">
       <div className="relative">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={producer.photo}
           alt={producer.name}

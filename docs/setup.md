@@ -58,11 +58,20 @@ cd backend
 php artisan serve
 ```
 
-Run migrations:
+Run migrations (and seed demo data):
 
 ```bash
 cd backend
-php artisan migrate
+php artisan migrate --seed
+```
+
+Link the public storage disk so uploaded product images are served at
+`/storage/...`. This is required for seller-uploaded images to render
+(seeded demo products use remote placeholder URLs and do not need it):
+
+```bash
+cd backend
+php artisan storage:link
 ```
 
 Run backend tests:
@@ -171,6 +180,14 @@ Completed:
 - Backend auth and role tests
 
 Email verification and password reset are intentionally prepared as placeholders for Phase 1. Full email delivery is not implemented in Milestone 2.
+
+## QA Checklists by Milestone
+
+- Milestone 1 and 2: `docs/qa/milestone-1-2-qa.md`
+- Milestone 3 (simple checklist): `docs/qa/milestone-3-checklist.md`
+- Milestone 4 (simple checklist): `docs/qa/milestone-4-checklist.md`
+- Milestone 3 and 4 (detailed QA notes): `docs/qa/milestone-3-4-qa.md`
+- Full Phase 1 tracker: `docs/phase-1-milestones.md`
 
 ## Out of Scope for Milestone 1 and 2
 

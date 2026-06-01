@@ -26,9 +26,14 @@ class OrderController extends Controller
         ]);
 
         $product = Product::query()->where('status', 'active')->findOrFail($data['product_id']);
+        $quantity = $data['quantity'] ?? 1;
+
+        if ($product->stock !== null && $quantity > $product->stock) {
+            abort(422, "Stock insuficiente. Solo quedan {$product->stock} disponibles.");
+        }
 
         return response()->json([
-            'data' => $this->createOrder($request, [$this->orderItemFromProduct($product, $data['quantity'] ?? 1)], $data),
+            'data' => $this->createOrder($request, [$this->orderItemFromProduct($product, $quantity)], $data),
         ], 201);
     }
 
@@ -54,6 +59,18 @@ class OrderController extends Controller
             'product_name' => $item->product_name_snapshot ?? $item->product->name,
             'unit_price_cents' => $item->unit_price_cents_snapshot ?? $item->product->price_cents,
         ])->all();
+
+        // Validate stock for all cart items
+        foreach ($items as $item) {
+            $product = $item['product'];
+            if ($product->stock !== null && $item['quantity'] > $product->stock) {
+                abort(422, "Stock insuficiente para \"{$product->name}\". Solo quedan {$product->stock} disponibles.");
+            }
+            if ($product->status !== 'active') {
+                abort(422, "El producto \"{$product->name}\" ya no está disponible.");
+            }
+        }
+
         $orders = $this->createGroupedOrders($request, $items, $data + ['delivery_type' => $cart->delivery_type]);
         $cart->items()->delete();
 
@@ -110,7 +127,7 @@ class OrderController extends Controller
 
         return response()->json([
             'data' => Order::query()
-                ->with('items.product', 'buyer')
+                ->with('items.product', 'buyer', 'statusHistory')
                 ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
                 ->findOrFail($id),
         ]);
@@ -226,6 +243,11 @@ class OrderController extends Controller
                     'quantity' => $quantity,
                     'line_total_cents' => $unitPrice * $quantity,
                 ]);
+
+                // Decrement stock
+                if ($product->stock !== null) {
+                    $product->decrement('stock', $quantity);
+                }
             }
 
             $order->statusHistory()->create([

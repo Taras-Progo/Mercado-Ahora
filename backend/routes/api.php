@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentWebhookController;
+use App\Http\Controllers\Api\ProductImageController;
 use App\Http\Controllers\Api\SellerController;
 use Illuminate\Support\Facades\Route;
 
@@ -82,6 +83,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/seller/orders/{id}', [OrderController::class, 'sellerOrder']);
             Route::patch('/seller/orders/{id}/status', [OrderController::class, 'updateSellerStatus']);
             Route::get('/seller/returns', [OrderController::class, 'returns']);
+            Route::post('/seller/products/{product}/images', [ProductImageController::class, 'store']);
+            Route::patch('/seller/products/{product}/images/{image}', [ProductImageController::class, 'update']);
+            Route::delete('/seller/products/{product}/images/{image}', [ProductImageController::class, 'destroy']);
         });
 
         Route::middleware('role:admin')->group(function () {

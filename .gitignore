@@ -24,9 +24,15 @@ Thumbs.db
 
 # Document render QA artifacts
 docs/architecture/docx-render/
+docs/architecture/docx/
 
+# Non-code project files at root
+Chat (1).txt
 Info (3).txt
-Logo - Mercado Ahora (1).png 
-Page Structure (1).txt 
-Chat (1).txt 
+Logo - Mercado Ahora (1).png
+maercado-logo-tr.png
 page screen
+Page Structure (1).txt
+Structure Design.docx
+
+vendor
