@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\ProducerProfile;
 use App\Models\ProducerSocialLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,6 +17,87 @@ class SellerController extends Controller
         return response()->json([
             'data' => $request->user()->producerProfile()->first(),
         ]);
+    }
+
+    /**
+     * Let an existing (logged-in) buyer become a producer without creating a
+     * second account. Creates a pending producer profile and upgrades the
+     * account to the seller role. The seller role keeps every buyer ability
+     * (the cart/orders/chat routes allow both buyer and seller), so the same
+     * account can buy and sell at once.
+     */
+    public function apply(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->role === 'admin') {
+            abort(403, 'Una cuenta de administrador no puede postularse como productor.');
+        }
+
+        $existing = $user->producerProfile()->first();
+
+        // Already approved: nothing to do, just point them to their panel.
+        if ($existing && $existing->status === 'active') {
+            return response()->json([
+                'data' => [
+                    'message' => 'Tu cuenta ya está habilitada como productor.',
+                    'status' => 'active',
+                    'user' => $user->load('producerProfile'),
+                ],
+            ]);
+        }
+
+        // A postulation is already under review.
+        if ($existing && $existing->status === 'pending') {
+            return response()->json([
+                'data' => [
+                    'message' => 'Ya tenés una postulación en revisión. Un administrador la evaluará pronto.',
+                    'status' => 'pending',
+                    'user' => $user->load('producerProfile'),
+                ],
+            ]);
+        }
+
+        $data = $request->validate([
+            'business_name' => ['required', 'string', 'max:255'],
+            'province' => ['nullable', 'string', 'max:120'],
+            'city' => ['nullable', 'string', 'max:120'],
+            'description' => ['nullable', 'string'],
+            'production_practices' => ['nullable', 'string'],
+            'production_origin' => ['nullable', 'string', 'max:120'],
+            'product_types' => ['nullable', 'string'],
+            'production_method' => ['nullable', 'string', 'max:120'],
+            'production_since' => ['nullable', 'string', 'max:120'],
+            'story' => ['nullable', 'string'],
+            'digital_presence_notes' => ['nullable', 'string'],
+        ]);
+
+        // Create a fresh profile, or re-open a previously rejected one.
+        $profile = $user->producerProfile()->updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                ...$data,
+                'slug' => $existing?->slug ?? $this->uniqueProfileSlug($data['business_name']),
+                'status' => 'pending',
+                'approved_by' => null,
+                'approved_at' => null,
+                'approval_notes' => null,
+                'rejection_reason' => null,
+            ],
+        );
+
+        if ($user->role === 'buyer') {
+            $user->update(['role' => 'seller']);
+        }
+
+        return response()->json([
+            'data' => [
+                'message' => 'Postulación enviada. Un administrador la revisará pronto.',
+                'status' => $profile->status,
+                'user' => $user->fresh()->load('producerProfile'),
+                'profile' => $profile,
+            ],
+        ], 201);
     }
 
     public function saveProfile(Request $request): JsonResponse
@@ -196,6 +278,20 @@ class SellerController extends Controller
             'ecoscore_notes' => ['nullable', 'string'],
             'status' => ['nullable', 'string', 'max:30'],
         ]);
+    }
+
+    private function uniqueProfileSlug(string $name): string
+    {
+        $base = Str::slug($name) ?: 'productor';
+        $slug = $base;
+        $counter = 2;
+
+        while (ProducerProfile::query()->where('slug', $slug)->exists()) {
+            $slug = "{$base}-{$counter}";
+            $counter++;
+        }
+
+        return $slug;
     }
 
     private function uniqueProductSlug(string $name): string

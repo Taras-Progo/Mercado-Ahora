@@ -35,7 +35,7 @@ export default function RegisterChooserPage() {
   return (
     <AuthLayout
       title="Sumate a Mercado Ahora"
-      subtitle="Elegí cómo querés participar. Podés cambiar de rol más adelante contactando a soporte."
+      subtitle="Elegí cómo querés empezar. Si te registrás como comprador, después podés convertirte en productor desde tu cuenta, sin crear otra cuenta."
       footer={
         <p className="mt-8 text-center text-sm text-stone-600">
           ¿Ya tenés cuenta?{" "}

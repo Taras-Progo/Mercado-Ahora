@@ -525,6 +525,32 @@ export async function getSellerDashboard(): Promise<SellerDashboard> {
   }
 }
 
+// ---- Become a producer (existing account) ----
+
+export type SellerApplyPayload = {
+  business_name: string;
+  province?: string;
+  city?: string;
+  description?: string;
+  production_practices?: string;
+  production_origin?: string;
+  product_types?: string;
+  production_method?: string;
+  production_since?: string;
+  story?: string;
+  digital_presence_notes?: string;
+};
+
+export type SellerApplyResult = {
+  message?: string;
+  status?: "pending" | "active" | "rejected";
+};
+
+// Upgrades the currently logged-in account to a producer (no new email/password).
+export async function applyAsSeller(payload: SellerApplyPayload): Promise<SellerApplyResult> {
+  return apiAuthPost<SellerApplyResult>("/seller/apply", payload);
+}
+
 // ---- Seller Orders API ----
 
 export async function getSellerOrders(): Promise<Order[]> {

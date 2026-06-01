@@ -167,14 +167,15 @@ export default function BuyerAccountPage() {
                   ¿Querés vender en Mercado Ahora?
                 </h3>
                 <p className="mt-1 text-sm text-brown-muted">
-                  Si además producís alimentos, artesanías o productos naturales, podés postularte
-                  como productor. Un administrador revisará tu solicitud.
+                  Si además producís alimentos, artesanías o productos naturales, podés convertirte
+                  en productor con esta misma cuenta, sin registrarte de nuevo. Un administrador
+                  revisará tu solicitud y vas a poder comprar y vender desde el mismo lugar.
                 </p>
                 <Link
                   href="/seller/apply"
                   className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-olive-dark hover:text-olive"
                 >
-                  Postular como productor
+                  Convertirme en productor
                   <ChevronRightIcon className="h-3.5 w-3.5" />
                 </Link>
               </div>

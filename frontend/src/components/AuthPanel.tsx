@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { parseApiMessage, roleHome, useAuth } from "@/components/AuthProvider";
-import { EyeIcon, LeafIcon } from "@/components/ui/Icons";
+import { parseApiMessage, producerStatusOf, roleHome, useAuth } from "@/components/AuthProvider";
+import { applyAsSeller, type SellerApplyPayload } from "@/lib/api";
+import { CheckCircleIcon, ClockIcon, EyeIcon, LeafIcon } from "@/components/ui/Icons";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
 
@@ -18,7 +19,13 @@ export function AuthPanel({ mode }: { mode: Mode }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user, ready, refresh } = useAuth();
+
+  // A logged-in user reaching the producer application upgrades their existing
+  // account instead of registering a brand-new one (no second email needed).
+  const loggedIn = ready && !!user;
+  const sellerUpgrade = mode === "seller-apply" && loggedIn;
+  const producerStatus = producerStatusOf(user);
 
   const endpoint =
     mode === "login"
@@ -34,6 +41,24 @@ export function AuthPanel({ mode }: { mode: Mode }) {
 
     const form = new FormData(event.currentTarget);
     const body = Object.fromEntries(form.entries());
+
+    // Existing account becoming a producer: authenticated upgrade.
+    if (sellerUpgrade) {
+      try {
+        const result = await applyAsSeller(body as unknown as SellerApplyPayload);
+        await refresh();
+        setMessage({
+          tone: "success",
+          text: result.message ?? "Postulación enviada. Te avisaremos al aprobarla.",
+        });
+        router.push("/seller");
+      } catch (err) {
+        setMessage({ tone: "error", text: err instanceof Error ? err.message : "No se pudo enviar la postulación." });
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -64,9 +89,38 @@ export function AuthPanel({ mode }: { mode: Mode }) {
     }
   }
 
+  // Avoid flashing the anonymous (email/password) form while auth state loads.
+  if (mode === "seller-apply" && !ready) {
+    return (
+      <div className="grid gap-3">
+        <div className="h-12 animate-pulse rounded-xl bg-cream-card" />
+        <div className="h-12 animate-pulse rounded-xl bg-cream-card" />
+        <div className="h-12 animate-pulse rounded-xl bg-cream-card" />
+      </div>
+    );
+  }
+
+  // Already applied / already a producer: show status instead of the form.
+  if (sellerUpgrade && (producerStatus === "pending" || producerStatus === "active")) {
+    return <ProducerStatusPanel status={producerStatus} />;
+  }
+
   return (
     <form onSubmit={submit} className="grid gap-4">
-      {(mode === "register" || mode === "seller-apply") && (
+      {sellerUpgrade && (
+        <div className="rounded-xl border border-olive-light/40 bg-olive-muted px-4 py-3 text-sm text-olive-dark">
+          {producerStatus === "rejected" ? (
+            <p>Tu postulación anterior fue rechazada. Podés volver a postularte con tu cuenta actual.</p>
+          ) : (
+            <p>
+              Vas a postularte como productor con tu cuenta actual{user?.email ? ` (${user.email})` : ""}. Vas a poder
+              comprar y vender desde la misma cuenta.
+            </p>
+          )}
+        </div>
+      )}
+
+      {(mode === "register" || (mode === "seller-apply" && !sellerUpgrade)) && (
         <Field label="Nombre completo">
           <input name="name" className={inputClass} placeholder="Tu nombre" required />
         </Field>
@@ -88,30 +142,34 @@ export function AuthPanel({ mode }: { mode: Mode }) {
         </>
       )}
 
-      <Field label="Email">
-        <input name="email" type="email" className={inputClass} placeholder="tu@email.com" required />
-      </Field>
+      {!sellerUpgrade && (
+        <>
+          <Field label="Email">
+            <input name="email" type="email" className={inputClass} placeholder="tu@email.com" required />
+          </Field>
 
-      <Field label="Contraseña" hint={mode !== "login" ? "Mínimo 8 caracteres" : undefined}>
-        <div className="relative">
-          <input
-            name="password"
-            type={showPassword ? "text" : "password"}
-            minLength={8}
-            className={`${inputClass} pr-12`}
-            placeholder="••••••••"
-            required
-          />
-          <button
-            type="button"
-            aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-            onClick={() => setShowPassword((value) => !value)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-stone-400 hover:bg-olive-muted hover:text-olive"
-          >
-            <EyeIcon className="h-4 w-4" />
-          </button>
-        </div>
-      </Field>
+          <Field label="Contraseña" hint={mode !== "login" ? "Mínimo 8 caracteres" : undefined}>
+            <div className="relative">
+              <input
+                name="password"
+                type={showPassword ? "text" : "password"}
+                minLength={8}
+                className={`${inputClass} pr-12`}
+                placeholder="••••••••"
+                required
+              />
+              <button
+                type="button"
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                onClick={() => setShowPassword((value) => !value)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-stone-400 hover:bg-olive-muted hover:text-olive"
+              >
+                <EyeIcon className="h-4 w-4" />
+              </button>
+            </div>
+          </Field>
+        </>
+      )}
 
       {mode === "login" && (
         <div className="flex items-center justify-between text-sm">
@@ -154,6 +212,44 @@ export function AuthPanel({ mode }: { mode: Mode }) {
         </p>
       )}
     </form>
+  );
+}
+
+function ProducerStatusPanel({ status }: { status: "pending" | "active" }) {
+  const pending = status === "pending";
+  return (
+    <div className="grid gap-4">
+      <div
+        className={`flex items-start gap-3 rounded-2xl border p-5 ${
+          pending ? "border-amber-300 bg-amber-50" : "border-olive-light/40 bg-olive-muted"
+        }`}
+      >
+        <span
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+            pending ? "bg-amber-100 text-amber-700" : "bg-white text-olive-dark"
+          }`}
+        >
+          {pending ? <ClockIcon className="h-5 w-5" /> : <CheckCircleIcon className="h-5 w-5" />}
+        </span>
+        <div>
+          <p className={`text-sm font-semibold ${pending ? "text-amber-900" : "text-olive-dark"}`}>
+            {pending ? "Tu postulación está en revisión" : "¡Tu cuenta ya es productora!"}
+          </p>
+          <p className={`mt-1 text-sm ${pending ? "text-amber-800" : "text-olive-dark/80"}`}>
+            {pending
+              ? "Un administrador la evaluará pronto. Mientras tanto seguís pudiendo comprar con tu cuenta."
+              : "Podés gestionar tus productos y pedidos desde el panel del productor, y seguir comprando normalmente."}
+          </p>
+        </div>
+      </div>
+      <Link
+        href="/seller"
+        className="btn-primary inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-semibold"
+      >
+        <LeafIcon className="h-4 w-4" />
+        Ir a mi panel de productor
+      </Link>
+    </div>
   );
 }
 

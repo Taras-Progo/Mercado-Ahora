@@ -38,6 +38,10 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/users/me', [AuthController::class, 'me']);
 
+        // Any authenticated buyer (or previously rejected seller) can apply to
+        // become a producer with their existing account — no second email needed.
+        Route::post('/seller/apply', [SellerController::class, 'apply']);
+
         Route::middleware('role:buyer,seller')->group(function () {
             Route::get('/cart', [CartController::class, 'show']);
             Route::post('/cart/items', [CartController::class, 'addItem']);
