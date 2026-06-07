@@ -31,7 +31,7 @@ export function PasswordResetForm() {
       } else {
         setFeedback({
           tone: "success",
-          text: "Solicitud registrada. El envío automático de correo se entregará en una fase posterior; por ahora la infraestructura ya quedó preparada.",
+          text: "Solicitud registrada. Hasta activar el envío automático de correos, administración puede restablecer tu contraseña de forma manual.",
         });
       }
     } catch {

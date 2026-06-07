@@ -7,6 +7,8 @@ use App\Models\Category;
 use App\Models\ProducerProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -56,6 +58,18 @@ class ExampleTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.items.0.quantity', 2)
             ->assertJsonPath('data.items.0.unit_price_cents_snapshot', $product->price_cents);
+    }
+
+    public function test_login_with_wrong_password_returns_invalid_credentials(): void
+    {
+        $this->seed();
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'maria@compradora.com',
+            'password' => 'wrong-password',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('email');
     }
 
     public function test_seller_can_access_dashboard(): void
@@ -151,6 +165,25 @@ class ExampleTest extends TestCase
             ->postJson('/api/v1/checkout/cart', ['delivery_type' => 'local'])
             ->assertCreated()
             ->assertJsonPath('data.orders_count', 2);
+    }
+
+    public function test_checkout_decrements_stock(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $product = Product::query()->where('stock', '>=', 2)->firstOrFail();
+        $originalStock = $product->stock;
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 2])
+            ->assertCreated();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/cart', ['delivery_type' => 'local'])
+            ->assertCreated();
+
+        $this->assertSame($originalStock - 2, $product->refresh()->stock);
     }
 
     public function test_cart_and_checkout_keep_price_snapshot_when_product_price_changes(): void
@@ -282,6 +315,96 @@ class ExampleTest extends TestCase
             ])
             ->assertCreated()
             ->assertJsonPath('data.status', 'active');
+    }
+
+    public function test_admin_can_temporarily_reset_active_user_password(): void
+    {
+        $this->seed();
+
+        $admin = User::query()->where('email', 'admin@mercadoahora.com')->firstOrFail();
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $buyer->createToken('web');
+
+        $this->actingAs($admin, 'sanctum')
+            ->patchJson("/api/v1/admin/users/{$buyer->id}/password", [
+                'password' => 'new-password-123',
+                'password_confirmation' => 'new-password-123',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.user.email', 'maria@compradora.com');
+
+        $this->assertCount(0, $buyer->tokens()->get());
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'maria@compradora.com',
+            'password' => 'new-password-123',
+        ])->assertOk();
+    }
+
+    public function test_seller_sees_only_their_received_orders_and_status_changes_are_tracked(): void
+    {
+        $this->seed();
+
+        $seller = User::query()->where('email', 'finca@raicesverdes.com')->firstOrFail();
+
+        $response = $this->actingAs($seller, 'sanctum')
+            ->getJson('/api/v1/seller/orders')
+            ->assertOk();
+
+        $orders = collect($response->json('data'));
+        $this->assertTrue($orders->isNotEmpty());
+        $this->assertTrue($orders->every(fn ($order) => collect($order['items'])->every(
+            fn ($item) => (int) $item['product']['producer_profile_id'] === $seller->producerProfile->id
+        )));
+
+        $orderId = $orders->first()['id'];
+
+        $this->actingAs($seller, 'sanctum')
+            ->patchJson("/api/v1/seller/orders/{$orderId}/status", ['status' => 'processing'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'processing')
+            ->assertJsonFragment(['status' => 'processing']);
+
+        $this->actingAs($seller, 'sanctum')
+            ->patchJson("/api/v1/seller/orders/{$orderId}/status", ['status' => 'invalid-status'])
+            ->assertUnprocessable();
+    }
+
+    public function test_product_image_upload_validates_file_and_marks_first_image_primary(): void
+    {
+        if (! class_exists(\finfo::class)) {
+            $this->markTestSkipped('The fileinfo extension is required for upload validation tests.');
+        }
+
+        Storage::fake('public');
+        $this->seed();
+
+        $seller = User::query()->where('email', 'verde@amanecer.com')->firstOrFail();
+        $product = $seller->producerProfile->products()->create([
+            'category_id' => Category::query()->firstOrFail()->id,
+            'name' => 'Producto con imagen',
+            'slug' => 'producto-con-imagen',
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 5,
+            'unit' => 'unidad',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($seller, 'sanctum')
+            ->postJson("/api/v1/seller/products/{$product->id}/images", [
+                'image' => UploadedFile::fake()->create('document.pdf', 20, 'application/pdf'),
+            ])
+            ->assertUnprocessable();
+
+        $this->actingAs($seller, 'sanctum')
+            ->postJson("/api/v1/seller/products/{$product->id}/images", [
+                'image' => UploadedFile::fake()->image('product.jpg', 800, 800),
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.is_primary', true);
+
+        Storage::disk('public')->assertExists($product->images()->firstOrFail()->path);
     }
 
     public function test_non_admin_and_non_seller_route_guards_are_enforced(): void

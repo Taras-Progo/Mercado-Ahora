@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Product } from "@/lib/api";
 import {
   getSellerProducts,
+  imageUrl,
   money,
   pauseProduct,
   publishProduct,
@@ -199,7 +200,7 @@ function SellerProductsView() {
                       <div className="flex items-center gap-3">
                         {product.images?.[0] ? (
                           <img
-                            src={product.images[0].path.startsWith("http") ? product.images[0].path : `http://127.0.0.1:8000/storage/${product.images[0].path}`}
+                            src={imageUrl(product.images[0].path)}
                             alt=""
                             className="h-10 w-10 shrink-0 rounded-lg object-cover"
                           />

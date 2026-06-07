@@ -96,6 +96,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/admin/users', [AdminController::class, 'users']);
             Route::get('/admin/users/{id}', [AdminController::class, 'user']);
             Route::patch('/admin/users/{id}/status', [AdminController::class, 'updateUserStatus']);
+            Route::patch('/admin/users/{id}/password', [AdminController::class, 'resetUserPassword']);
             Route::get('/admin/producers', [AdminController::class, 'producers']);
             Route::patch('/admin/producers/{id}/status', [AdminController::class, 'updateProducerStatus']);
             Route::patch('/admin/producers/{id}/approve', [AdminController::class, 'approveProducer']);

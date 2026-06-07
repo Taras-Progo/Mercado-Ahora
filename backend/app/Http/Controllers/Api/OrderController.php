@@ -10,6 +10,7 @@ use App\Models\ReturnRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class OrderController extends Controller
 {
@@ -136,7 +137,10 @@ class OrderController extends Controller
     public function updateSellerStatus(Request $request, int $id): JsonResponse
     {
         $profile = $request->user()->producerProfile ?? abort(422, 'Perfil de productor requerido.');
-        $data = $request->validate(['status' => ['required', 'string', 'max:30'], 'note' => ['nullable', 'string']]);
+        $data = $request->validate([
+            'status' => ['required', 'string', Rule::in(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'])],
+            'note' => ['nullable', 'string'],
+        ]);
 
         $order = Order::query()
             ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))

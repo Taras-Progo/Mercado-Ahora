@@ -569,6 +569,9 @@ export default function ProductDetailPage() {
                 <p className="mt-1 text-sm text-emerald-700">
                   N° {buySuccess.orderNumber}
                 </p>
+                <p className="mt-2 text-xs text-emerald-700">
+                  El pedido queda pendiente. Coordina pago y entrega con el productor hasta integrar pagos online.
+                </p>
                 <div className="mt-3 flex gap-2">
                   <Link
                     href="/orders"

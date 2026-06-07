@@ -4,13 +4,15 @@ import { useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { ProducerReview } from "@/components/admin/ProducerReview";
+import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminReturns } from "@/components/admin/AdminReturns";
 
-type Tab = "producers" | "products" | "orders" | "returns";
+type Tab = "users" | "producers" | "products" | "orders" | "returns";
 
 const tabs: { id: Tab; label: string }[] = [
+  { id: "users", label: "Usuarios" },
   { id: "producers", label: "Productores" },
   { id: "products", label: "Productos" },
   { id: "orders", label: "Pedidos" },
@@ -19,7 +21,7 @@ const tabs: { id: Tab; label: string }[] = [
 
 export function AdminPanel() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>("producers");
+  const [tab, setTab] = useState<Tab>("users");
 
   return (
     <div className="grid gap-6">
@@ -49,6 +51,7 @@ export function AdminPanel() {
         ))}
       </nav>
 
+      {tab === "users" && <AdminUsers />}
       {tab === "producers" && <ProducerReview />}
       {tab === "products" && <AdminProducts />}
       {tab === "orders" && <AdminOrders />}

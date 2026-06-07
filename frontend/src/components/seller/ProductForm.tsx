@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Category, Product, ProductImage } from "@/lib/api";
 import {
   createProduct,
@@ -31,6 +31,7 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  const photosRef = useRef<HTMLDivElement>(null);
   // Tracks the persisted product: the one passed in (edit mode) or the draft we
   // create on first save (create mode). Once set, the image uploader is enabled.
   const [savedProduct, setSavedProduct] = useState<Product | null>(product ?? null);
@@ -103,6 +104,9 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
           setSavedProduct(created);
           setImages(created.images ?? []);
           setInfo("Producto creado como borrador. Agregá las fotos y luego publicalo.");
+          window.setTimeout(() => {
+            photosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }, 50);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Error al guardar el producto.");
@@ -131,6 +135,7 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
       )}
 
       {/* 1. Fotos del producto */}
+      <div ref={photosRef}>
       <SectionCard number={1} title="Fotos del producto" subtitle="Subí fotos claras y reales. La primera será la imagen principal.">
         {hasProduct && savedProduct ? (
           <ProductImageUpload productId={savedProduct.id} images={images} onImagesChange={setImages} />
@@ -164,6 +169,7 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
           </div>
         )}
       </SectionCard>
+      </div>
 
       {/* 2. Información básica */}
       <SectionCard number={2} title="Información básica">

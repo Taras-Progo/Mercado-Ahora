@@ -6,6 +6,20 @@ REPO_URL="${REPO_URL:-https://github.com/Taras-Progo/Mercado-Ahora.git}"
 BRANCH="${BRANCH:-main}"
 ENV_FILE="${ENV_FILE:-.env.production}"
 
+set_env_value() {
+    key="$1"
+    value="$2"
+
+    if grep -q "^${key}=" "$ENV_FILE"; then
+        tmp_file="$(mktemp)"
+        awk -v key="$key" -v value="$value" 'BEGIN { prefix = key "=" } index($0, prefix) == 1 { print key "=" value; next } { print }' "$ENV_FILE" > "$tmp_file"
+        cat "$tmp_file" > "$ENV_FILE"
+        rm -f "$tmp_file"
+    else
+        printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+    fi
+}
+
 mkdir -p "$APP_DIR"
 
 if [ ! -d "$APP_DIR/.git" ]; then
@@ -54,8 +68,38 @@ FILESYSTEM_DISK=local
 MAIL_MAILER=log
 
 NEXT_PUBLIC_API_BASE_URL=/api/v1
+NEXT_PUBLIC_STORAGE_URL=/storage
 EOF
 fi
+
+if [ -n "${APP_URL:-}" ]; then
+    set_env_value "APP_URL" "$APP_URL"
+fi
+
+if [ -n "${APP_DOMAIN:-}" ]; then
+    set_env_value "APP_DOMAIN" "$APP_DOMAIN"
+fi
+
+if [ -n "${ACME_EMAIL:-}" ]; then
+    set_env_value "ACME_EMAIL" "$ACME_EMAIL"
+fi
+
+if [ -n "${SESSION_DOMAIN:-}" ]; then
+    set_env_value "SESSION_DOMAIN" "$SESSION_DOMAIN"
+fi
+
+if [ -n "${SANCTUM_STATEFUL_DOMAINS:-}" ]; then
+    set_env_value "SANCTUM_STATEFUL_DOMAINS" "$SANCTUM_STATEFUL_DOMAINS"
+fi
+
+case "${APP_URL:-}" in
+    https://*)
+        set_env_value "SESSION_SECURE_COOKIE" "true"
+        ;;
+esac
+
+set_env_value "NEXT_PUBLIC_API_BASE_URL" "${NEXT_PUBLIC_API_BASE_URL:-/api/v1}"
+set_env_value "NEXT_PUBLIC_STORAGE_URL" "${NEXT_PUBLIC_STORAGE_URL:-/storage}"
 
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml pull postgres caddy || true
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml build

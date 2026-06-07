@@ -10,6 +10,8 @@ use App\Models\ReturnRequest;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
 {
@@ -30,6 +32,32 @@ class AdminController extends Controller
         $user->update($data);
 
         return response()->json(['data' => $user]);
+    }
+
+    public function resetUserPassword(Request $request, int $id): JsonResponse
+    {
+        $data = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::query()->findOrFail($id);
+
+        if ($user->status !== 'active') {
+            abort(422, 'Solo se puede restablecer la contrasena de usuarios activos.');
+        }
+
+        $user->forceFill([
+            'password' => Hash::make($data['password']),
+        ])->save();
+
+        $user->tokens()->delete();
+
+        return response()->json([
+            'data' => [
+                'user' => $user->fresh(),
+                'message' => 'Contrasena restablecida. El usuario debera ingresar con la nueva contrasena temporal.',
+            ],
+        ]);
     }
 
     public function producers(): JsonResponse
@@ -137,7 +165,10 @@ class AdminController extends Controller
 
     public function updateOrderStatus(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['status' => ['required', 'string', 'max:30'], 'note' => ['nullable', 'string']]);
+        $data = $request->validate([
+            'status' => ['required', 'string', Rule::in(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'])],
+            'note' => ['nullable', 'string'],
+        ]);
         $order = Order::query()->findOrFail($id);
         $order->update(['status' => $data['status']]);
         $order->statusHistory()->create([

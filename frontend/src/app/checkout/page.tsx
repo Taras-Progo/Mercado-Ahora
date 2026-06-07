@@ -100,6 +100,9 @@ function CheckoutContent() {
               <p className="mt-2 text-sm text-brown-muted">
                 {result.message}
               </p>
+              <p className="mt-2 text-xs text-stone-500">
+                El pedido queda pendiente. El comprador y el productor coordinan pago y entrega manualmente por mensaje o datos de entrega.
+              </p>
               {result.orders_count > 1 && (
                 <p className="mt-1 text-xs text-stone-500">
                   Se generaron {result.orders_count} pedidos separados por productor.
@@ -325,6 +328,9 @@ function CheckoutContent() {
                 </button>
                 <p className="mt-2 text-center text-xs text-stone-400">
                   Al confirmar, se generarán pedidos separados por productor.
+                </p>
+                <p className="mt-1 text-center text-xs text-stone-500">
+                  Pago y envio se coordinan manualmente con el productor hasta integrar pagos online y logistica.
                 </p>
               </div>
             </>

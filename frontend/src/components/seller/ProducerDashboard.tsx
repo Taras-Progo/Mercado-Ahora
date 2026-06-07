@@ -4,8 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { producerStatusOf, useAuth } from "@/components/AuthProvider";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
-import type { Order, Product, SellerDashboard } from "@/lib/api";
+import type { Conversation, Order, Product, SellerDashboard } from "@/lib/api";
 import {
+  getConversations,
   getSellerDashboard,
   getSellerOrders,
   getSellerProducts,
@@ -16,7 +17,6 @@ import {
 import {
   BagIcon,
   BellIcon,
-  CheckCircleIcon,
   ChevronRightIcon,
   ClockIcon,
   HeartIcon,
@@ -38,12 +38,6 @@ type SidebarItem = {
   active?: boolean;
 };
 
-const ecoChecks = [
-  "Producción responsable",
-  "Envíos sostenibles",
-  "Packaging ecológico",
-];
-
 export function ProducerDashboard() {
   const { user } = useAuth();
   const producerStatus = producerStatusOf(user);
@@ -53,16 +47,19 @@ export function ProducerDashboard() {
   const [dashboard, setDashboard] = useState<SellerDashboard>({});
   const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
 
   const load = useCallback(async () => {
-    const [d, o, p] = await Promise.all([
+    const [d, o, p, c] = await Promise.all([
       getSellerDashboard(),
       getSellerOrders(),
       getSellerProducts(),
+      getConversations(),
     ]);
     setDashboard(d);
     setOrders(o);
     setProducts(p);
+    setConversations(c);
   }, []);
 
   useEffect(() => {
@@ -114,6 +111,14 @@ export function ProducerDashboard() {
 
   const recentOrders = orders.slice(0, 3);
   const recentProducts = products.slice(0, 3);
+  const productsWithEcoScore = products.filter((product) => product.ecoscore_points != null);
+  const ecoScore =
+    productsWithEcoScore.length > 0
+      ? Math.round(
+          productsWithEcoScore.reduce((sum, product) => sum + (product.ecoscore_points ?? 0), 0) /
+            productsWithEcoScore.length,
+        )
+      : 0;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
@@ -190,27 +195,23 @@ export function ProducerDashboard() {
           <div className="grid gap-6">
             <DashboardCard title="EcoScore" action={{ label: "Ver más", href: "/seller/ecoscore" }}>
               <div className="flex items-center gap-5">
-                <EcoGauge value={85} />
+                <EcoGauge value={ecoScore} />
                 <div>
-                  <p className="text-sm font-semibold text-emerald-800">Nivel Alto</p>
+                  <p className="text-sm font-semibold text-emerald-800">
+                    {ecoScore > 0 ? "EcoScore promedio" : "Sin EcoScore"}
+                  </p>
                   <p className="text-xs text-stone-500">
-                    ¡Excelente trabajo cuidando el ambiente!
+                    {ecoScore > 0
+                      ? "Calculado sobre tus productos con validacion cargada."
+                      : "Empeza en 0. Administracion validara el puntaje cuando corresponda."}
                   </p>
                 </div>
               </div>
-              <ul className="mt-5 grid gap-2 text-sm text-stone-700">
-                {ecoChecks.map((check) => (
-                  <li key={check} className="inline-flex items-center gap-2">
-                    <CheckCircleIcon className="h-4 w-4 text-emerald-600" />
-                    {check}
-                  </li>
-                ))}
-              </ul>
               <Link
                 href="/seller/ecoscore"
                 className="mt-4 inline-block text-xs font-semibold text-olive-dark hover:underline"
               >
-                ¿Cómo mejorar mi EcoScore?
+                Como mejorar mi EcoScore?
               </Link>
             </DashboardCard>
 
@@ -221,7 +222,7 @@ export function ProducerDashboard() {
         <div className="grid gap-6 xl:grid-cols-3">
           <NewsComposer />
           <FollowersCard />
-          <RecentMessages />
+          <RecentMessages conversations={conversations} />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -473,28 +474,14 @@ function EcoGauge({ value }: { value: number }) {
 }
 
 function SalesChart() {
-  // Illustrative weekly trend (sales analytics arrive in Fase 2).
-  const weeks = [
-    { label: "Sem. 1", value: 40 },
-    { label: "Sem. 2", value: 55 },
-    { label: "Sem. 3", value: 35 },
-    { label: "Sem. 4", value: 85 },
-  ];
   return (
     <section className="rounded-2xl border border-border-soft bg-white p-5">
       <h2 className="text-base font-semibold text-stone-900">Ventas de las últimas 4 semanas</h2>
-      <div className="mt-5 flex h-40 items-end justify-between gap-4">
-        {weeks.map((week) => (
-          <div key={week.label} className="flex flex-1 flex-col items-center gap-2">
-            <div className="flex h-32 w-full items-end">
-              <div
-                className="w-full rounded-t-lg bg-olive/80"
-                style={{ height: `${week.value}%` }}
-              />
-            </div>
-            <span className="text-xs text-stone-500">{week.label}</span>
-          </div>
-        ))}
+      <div className="mt-5 grid h-40 place-items-center rounded-xl border border-dashed border-border-soft bg-cream-card px-5 text-center">
+        <div>
+          <p className="text-sm font-semibold text-stone-700">Sin ventas registradas</p>
+          <p className="mt-1 text-xs text-stone-500">Las estadisticas reales apareceran cuando haya pedidos entregados.</p>
+        </div>
       </div>
     </section>
   );
@@ -503,21 +490,23 @@ function SalesChart() {
 function NewsComposer() {
   return (
     <DashboardCard title="Novedades para clientes">
-      <p className="text-xs text-stone-500">Compartí novedades directamente con tus seguidores.</p>
+      <p className="text-xs text-stone-500">Proximamente vas a poder compartir novedades con tus seguidores.</p>
       <textarea
-        placeholder="Ej: Esta semana hay miel multifloral fresca."
-        className="mt-3 min-h-24 w-full rounded-xl border border-border-soft bg-cream-card p-3 text-sm outline-none focus:border-olive focus:ring-2 focus:ring-olive/20"
+        disabled
+        placeholder="Novedades disponible en una proxima etapa."
+        className="mt-3 min-h-24 w-full resize-none rounded-xl border border-border-soft bg-cream-card p-3 text-sm text-stone-500 outline-none"
       />
       <div className="mt-3 flex items-center justify-between">
         <p className="inline-flex items-center gap-1.5 text-xs text-stone-500">
           <UsersIcon className="h-4 w-4" />
-          Tus seguidores
+          0 seguidores
         </p>
         <button
           type="button"
-          className="rounded-full bg-olive-dark px-4 py-2 text-xs font-semibold text-white transition hover:bg-olive"
+          disabled
+          className="rounded-full bg-stone-200 px-4 py-2 text-xs font-semibold text-stone-500"
         >
-          Enviar a mis seguidores
+          Proximamente
         </button>
       </div>
     </DashboardCard>
@@ -527,58 +516,65 @@ function NewsComposer() {
 function FollowersCard() {
   return (
     <DashboardCard title="Seguidores" action={{ label: "Ver lista", href: "/seller/followers" }}>
-      <p className="font-serif text-3xl font-bold text-stone-900">124</p>
-      <p className="text-xs text-stone-500">Personas que reciben tus novedades</p>
-      <div className="mt-4 flex items-center gap-2">
-        <div className="flex -space-x-2">
-          {[0, 1, 2, 3].map((i) => (
-            <span
-              key={i}
-              className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-olive-muted text-[10px] font-bold text-olive-dark"
-            >
-              {String.fromCharCode(65 + i)}
-            </span>
-          ))}
-        </div>
-        <span className="text-xs font-semibold text-stone-500">+119</span>
+      <p className="font-serif text-3xl font-bold text-stone-900">0</p>
+      <p className="text-xs text-stone-500">Todavia no hay seguidores registrados.</p>
+      <div className="mt-4 rounded-xl border border-dashed border-border-soft bg-cream-card p-4 text-xs text-stone-500">
+        Esta funcionalidad pertenece a una proxima etapa. No se mostraran datos inventados en cuentas nuevas.
       </div>
-      <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-olive-muted px-3 py-1.5 text-xs font-medium text-olive-dark">
-        <TrendingUpIcon className="h-3.5 w-3.5" /> +12 nuevos esta semana
-      </p>
     </DashboardCard>
   );
 }
 
-function RecentMessages() {
-  const chats = [
-    { name: "María González", message: "¿Tenés miel cremosa?", time: "16:20" },
-    { name: "Carlos Pérez", message: "Consulta sobre envío", time: "15:10" },
-    { name: "Lucía Fernanda", message: "Gracias por la miel, ¡riquísima!", time: "Ayer" },
-  ];
+function RecentMessages({ conversations }: { conversations: Conversation[] }) {
+  const chats = conversations.slice(0, 3).map((conversation) => {
+    const buyer = (conversation as Conversation & { buyer?: { name?: string } }).buyer;
+    const lastMessage = conversation.messages?.[0]?.body;
+    return {
+      id: conversation.id,
+      name: buyer?.name ?? "Comprador",
+      message: lastMessage ?? "Sin mensajes todavia",
+      time: conversation.last_message_at
+        ? new Date(conversation.last_message_at).toLocaleDateString("es-AR", {
+            day: "numeric",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "",
+    };
+  });
 
   return (
     <DashboardCard title="Mensajes" action={{ label: "Ir a chat", href: "/chat" }}>
-      <p className="-mt-2 mb-2 text-xs text-stone-500">3 conversaciones activas</p>
-      <ul className="grid divide-y divide-border-soft">
-        {chats.map((chat) => (
-          <li key={chat.name} className="flex items-center justify-between py-3">
-            <div className="flex items-center gap-3">
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-olive-muted text-xs font-bold text-olive-dark">
-                {chat.name
-                  .split(" ")
-                  .map((part) => part[0])
-                  .slice(0, 2)
-                  .join("")}
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-stone-800">{chat.name}</p>
-                <p className="truncate text-xs text-stone-500">{chat.message}</p>
+      <p className="-mt-2 mb-2 text-xs text-stone-500">
+        {conversations.length} conversaciones activas
+      </p>
+      {chats.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border-soft bg-cream-card p-4 text-sm text-stone-500">
+          No tenes conversaciones todavia. Los mensajes reales apareceran aca cuando un comprador te contacte.
+        </div>
+      ) : (
+        <ul className="grid divide-y divide-border-soft">
+          {chats.map((chat) => (
+            <li key={chat.id} className="flex items-center justify-between py-3">
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-olive-muted text-xs font-bold text-olive-dark">
+                  {chat.name
+                    .split(" ")
+                    .map((part) => part[0])
+                    .slice(0, 2)
+                    .join("")}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-stone-800">{chat.name}</p>
+                  <p className="truncate text-xs text-stone-500">{chat.message}</p>
+                </div>
               </div>
-            </div>
-            <span className="text-xs text-stone-400">{chat.time}</span>
-          </li>
-        ))}
-      </ul>
+              <span className="shrink-0 text-xs text-stone-400">{chat.time}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </DashboardCard>
   );
 }
@@ -592,14 +588,14 @@ function NearbyBuyersBanner() {
         </span>
         <div>
           <p className="text-sm font-semibold text-olive-dark">Compradores cerca de vos</p>
-          <p className="text-xs text-olive-dark/80">Hay 18 personas interesadas en productos naturales a menos de 20 km de tu ubicación.</p>
+          <p className="text-xs text-olive-dark/80">Proximamente se mostraran interesados reales segun ubicacion y categorias.</p>
         </div>
       </div>
       <Link
         href="/seller/followers"
         className="inline-flex shrink-0 items-center justify-center rounded-full bg-olive-dark px-4 py-2 text-xs font-semibold text-white transition hover:bg-olive"
       >
-        Ver interesados
+        Proximamente
       </Link>
     </div>
   );

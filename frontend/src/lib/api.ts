@@ -440,7 +440,12 @@ export async function deleteProductImage(productId: number, imageId: number): Pr
 
 export function imageUrl(path: string): string {
   if (path.startsWith("http")) return path;
-  const base = process.env.NEXT_PUBLIC_STORAGE_URL ?? "http://127.0.0.1:8000/storage";
+  const configured = process.env.NEXT_PUBLIC_STORAGE_URL;
+  const base =
+    configured ??
+    (API_BASE.startsWith("http")
+      ? `${new URL(API_BASE).origin}/storage`
+      : "/storage");
   return `${base}/${path}`;
 }
 
@@ -623,6 +628,38 @@ export type ReturnRequest = {
   status: string;
   created_at?: string;
 };
+
+export type AdminUser = {
+  id: number;
+  name: string;
+  email: string;
+  phone?: string | null;
+  role: "buyer" | "seller" | "admin";
+  status: string;
+  created_at?: string;
+  email_verified_at?: string | null;
+  producer_profile?: ProducerProfile | null;
+  producerProfile?: ProducerProfile | null;
+};
+
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  try {
+    return await apiAuthGet<AdminUser[]>("/admin/users");
+  } catch {
+    return [];
+  }
+}
+
+export async function resetAdminUserPassword(
+  id: number,
+  password: string,
+  passwordConfirmation: string,
+): Promise<{ user: AdminUser; message: string }> {
+  return apiAuthPatch<{ user: AdminUser; message: string }>(`/admin/users/${id}/password`, {
+    password,
+    password_confirmation: passwordConfirmation,
+  });
+}
 
 export async function getAdminProducts(): Promise<Product[]> {
   try {

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { BagIcon, ChevronDownIcon, HeartIcon, MessageIcon, SearchIcon } from "@/components/ui/Icons";
 import { useAuth } from "@/components/AuthProvider";
+import { getCart, getConversations } from "@/lib/api";
 
 type NavItem = { label: string; href: string };
 
@@ -26,6 +27,8 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const router = useRouter();
   const { user, ready, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+  const [messageCount, setMessageCount] = useState(0);
 
   const transparent = variant === "transparent";
   const showNav = variant !== "minimal";
@@ -45,6 +48,28 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenuOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!ready || !user) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadCounts() {
+      const [cart, conversations] = await Promise.all([getCart(), getConversations()]);
+      if (cancelled) return;
+      const nextCartCount = cart.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+      setCartCount(nextCartCount);
+      setMessageCount(conversations.length);
+    }
+
+    void loadCounts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, user]);
 
   async function handleLogout() {
     setMenuOpen(false);
@@ -89,14 +114,14 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           </IconButton>
           {/* Secondary icons collapse into the mobile menu on small screens. */}
           <span className="hidden items-center gap-1 sm:flex sm:gap-2">
-            <IconButton transparent={transparent} ariaLabel="Mensajes" href="/chat" badge={2}>
+            <IconButton transparent={transparent} ariaLabel="Mensajes" href="/chat" badge={user && messageCount > 0 ? messageCount : undefined}>
               <MessageIcon className="h-5 w-5" />
             </IconButton>
             <IconButton transparent={transparent} ariaLabel="Favoritos" href="/favoritos">
               <HeartIcon className="h-5 w-5" />
             </IconButton>
           </span>
-          <IconButton transparent={transparent} ariaLabel="Carrito" href="/cart" badge={user ? 3 : undefined}>
+          <IconButton transparent={transparent} ariaLabel="Carrito" href="/cart" badge={user && cartCount > 0 ? cartCount : undefined}>
             <BagIcon className="h-5 w-5" />
           </IconButton>
 
