@@ -141,10 +141,11 @@ class SellerController extends Controller
                     : 'El perfil debe ser aprobado por administración antes de publicar productos activos.',
                 'products_count' => $profile ? $profile->products()->count() : 0,
                 'active_products_count' => $profile ? $profile->products()->where('status', 'active')->count() : 0,
+                'profile_completion_percent' => $this->profileCompletionPercent($profile),
                 'pending_orders_count' => $profile ? $profile->products()
                     ->join('order_items', 'products.id', '=', 'order_items.product_id')
                     ->join('orders', 'orders.id', '=', 'order_items.order_id')
-                    ->whereIn('orders.status', ['pending', 'confirmed', 'preparing'])
+                    ->whereIn('orders.status', ['pending', 'confirmed', 'processing'])
                     ->count() : 0,
             ],
         ]);
@@ -257,6 +258,32 @@ class SellerController extends Controller
         if ($status === 'active' && $profile->status !== 'active') {
             abort(403, 'El productor debe estar aprobado antes de publicar productos activos.');
         }
+    }
+
+    private function profileCompletionPercent(?ProducerProfile $profile): int
+    {
+        if (! $profile) {
+            return 0;
+        }
+
+        $fields = [
+            'business_name',
+            'province',
+            'city',
+            'description',
+            'production_origin',
+            'product_types',
+            'production_method',
+            'production_since',
+            'story',
+            'digital_presence_notes',
+        ];
+
+        $completed = collect($fields)
+            ->filter(fn (string $field) => filled($profile->{$field}))
+            ->count();
+
+        return (int) round(($completed / count($fields)) * 100);
     }
 
     private function validateProduct(Request $request, bool $partial = false): array

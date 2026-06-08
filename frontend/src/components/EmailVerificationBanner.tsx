@@ -33,7 +33,7 @@ export function EmailVerificationBanner({ email, verified }: Props) {
         body: JSON.stringify({ email }),
       });
       if (response.ok) {
-        setFeedback("Reenvío preparado. El envío real de correo se entrega en una fase posterior.");
+        setFeedback("Te enviamos un email de verificacion. Revisa tu bandeja de entrada.");
       } else {
         setFeedback("No se pudo procesar la solicitud.");
       }
@@ -51,12 +51,9 @@ export function EmailVerificationBanner({ email, verified }: Props) {
           <MessageIcon className="h-4 w-4" />
         </span>
         <div className="text-sm text-amber-900">
-          <p className="font-semibold">Verificá tu email</p>
+          <p className="font-semibold">Verifica tu email</p>
           <p className="text-amber-800">
-            Confirmá <span className="font-semibold">{email}</span> para mejorar la seguridad de tu cuenta.{" "}
-            <span className="text-amber-700">
-              El envío automático de correo se entregará en una fase posterior; por ahora ya está preparado en el backend.
-            </span>
+            Confirma <span className="font-semibold">{email}</span> para mejorar la seguridad de tu cuenta.
           </p>
           {feedback && (
             <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs text-amber-900">
@@ -73,13 +70,13 @@ export function EmailVerificationBanner({ email, verified }: Props) {
           disabled={loading}
           className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
         >
-          {loading ? "Procesando…" : "Reenviar verificación"}
+          {loading ? "Procesando..." : "Reenviar verificacion"}
         </button>
         <Link
           href="/verificar-email"
           className="rounded-full border border-amber-300 px-4 py-2 text-xs font-semibold text-amber-800 transition hover:bg-amber-100"
         >
-          Más info
+          Mas info
         </Link>
         <button
           type="button"
@@ -87,7 +84,7 @@ export function EmailVerificationBanner({ email, verified }: Props) {
           aria-label="Cerrar aviso"
           className="rounded-full px-2 text-amber-700 hover:bg-amber-100"
         >
-          ×
+          x
         </button>
       </div>
     </div>

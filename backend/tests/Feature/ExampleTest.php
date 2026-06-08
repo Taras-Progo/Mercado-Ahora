@@ -4,11 +4,17 @@ namespace Tests\Feature;
 
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\ProducerProfile;
 use App\Models\User;
+use App\Notifications\FrontendVerifyEmailNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
@@ -81,7 +87,8 @@ class ExampleTest extends TestCase
         $this->actingAs($seller, 'sanctum')
             ->getJson('/api/v1/seller/dashboard')
             ->assertOk()
-            ->assertJsonPath('data.products_count', 3);
+            ->assertJsonPath('data.products_count', 3)
+            ->assertJsonStructure(['data' => ['profile_completion_percent']]);
     }
 
     public function test_pending_seller_cannot_publish_active_product(): void
@@ -427,23 +434,130 @@ class ExampleTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_email_verification_and_password_reset_placeholders_are_available(): void
+    public function test_email_verification_sends_signed_email_and_marks_user_verified(): void
     {
-        $this->seed();
+        Notification::fake();
+        config(['app.frontend_url' => 'http://localhost']);
 
-        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
-
-        $this->postJson('/api/v1/auth/password/forgot', ['email' => $buyer->email])
-            ->assertOk()
-            ->assertJsonPath('data.message', 'Flujo preparado para Fase 1.');
-
-        $this->postJson('/api/v1/auth/password/reset', ['email' => $buyer->email])
-            ->assertOk()
-            ->assertJsonPath('data.message', 'Flujo preparado para Fase 1.');
+        $buyer = User::factory()->create([
+            'email' => 'verify-me@example.com',
+            'email_verified_at' => null,
+            'role' => 'buyer',
+            'status' => 'active',
+        ]);
 
         $this->actingAs($buyer, 'sanctum')
             ->postJson('/api/v1/auth/email/verify')
             ->assertOk()
-            ->assertJsonPath('data.message', 'Verificación preparada.');
+            ->assertJsonPath('data.message', 'Te enviamos un email de verificacion.');
+
+        Notification::assertSentTo($buyer, FrontendVerifyEmailNotification::class);
+
+        $verificationUrl = URL::temporarySignedRoute(
+            'verification.verify',
+            now()->addMinutes(60),
+            [
+                'id' => $buyer->id,
+                'hash' => sha1($buyer->email),
+            ],
+        );
+
+        $this->get($verificationUrl)
+            ->assertRedirect('http://localhost/verificar-email?status=verified');
+
+        $this->assertNotNull($buyer->fresh()->email_verified_at);
+    }
+
+    public function test_password_reset_sends_email_and_updates_password(): void
+    {
+        $buyer = User::factory()->create([
+            'email' => 'reset-me@example.com',
+            'password' => 'old-password-123',
+            'role' => 'buyer',
+            'status' => 'active',
+        ]);
+
+        $this->postJson('/api/v1/auth/password/forgot', ['email' => $buyer->email])
+            ->assertOk()
+            ->assertJsonPath('data.message', 'Si el email existe, te enviamos instrucciones para restablecer la contrasena.');
+
+        $resetToken = Password::broker()->createToken($buyer);
+
+        $this->postJson('/api/v1/auth/password/reset', [
+            'email' => $buyer->email,
+            'token' => $resetToken,
+            'password' => 'new-password-123',
+            'password_confirmation' => 'new-password-123',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.message', 'Contrasena actualizada. Ya podes iniciar sesion.');
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => $buyer->email,
+            'password' => 'new-password-123',
+        ])->assertOk();
+    }
+
+    public function test_seller_dashboard_counts_processing_orders_and_real_profile_completion(): void
+    {
+        $seller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+
+        $profile = ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Perfil Minimo',
+            'slug' => 'perfil-minimo',
+            'status' => 'active',
+        ]);
+
+        $category = Category::query()->create([
+            'name' => 'Categoria prueba',
+            'slug' => 'categoria-prueba',
+        ]);
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Producto dashboard',
+            'slug' => 'producto-dashboard',
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 5,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $buyer = User::factory()->create([
+            'role' => 'buyer',
+            'status' => 'active',
+        ]);
+
+        $order = Order::query()->create([
+            'buyer_id' => $buyer->id,
+            'order_number' => 'MA-TEST-001',
+            'status' => 'processing',
+            'payment_status' => 'not_started',
+            'subtotal_cents' => 100000,
+            'delivery_cents' => 0,
+            'total_cents' => 100000,
+        ]);
+
+        OrderItem::query()->create([
+            'order_id' => $order->id,
+            'product_id' => $product->id,
+            'producer_profile_id' => $profile->id,
+            'product_name' => $product->name,
+            'unit_price_cents' => $product->price_cents,
+            'quantity' => 1,
+            'line_total_cents' => $product->price_cents,
+        ]);
+
+        $this->actingAs($seller, 'sanctum')
+            ->getJson('/api/v1/seller/dashboard')
+            ->assertOk()
+            ->assertJsonPath('data.pending_orders_count', 1)
+            ->assertJsonPath('data.profile_completion_percent', 10);
     }
 }

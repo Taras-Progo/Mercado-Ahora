@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ProducerProfile;
 use App\Models\User;
+use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -120,6 +123,94 @@ class AuthController extends Controller
         ]);
     }
 
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+        ]);
+
+        $user = User::query()->where('email', $data['email'])->first();
+
+        if ($user) {
+            $token = Password::broker()->createToken($user);
+            $user->sendPasswordResetNotification($token);
+        }
+
+        return response()->json([
+            'data' => [
+                'message' => 'Si el email existe, te enviamos instrucciones para restablecer la contrasena.',
+            ],
+        ]);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email' => ['required', 'email'],
+            'token' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $status = Password::reset(
+            $data,
+            function (User $user, string $password): void {
+                $user->forceFill([
+                    'password' => Hash::make($password),
+                    'remember_token' => Str::random(60),
+                ])->save();
+
+                $user->tokens()->delete();
+
+                event(new PasswordReset($user));
+            },
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => ['El enlace de recuperacion no es valido o ya vencio.'],
+            ]);
+        }
+
+        return response()->json([
+            'data' => [
+                'message' => 'Contrasena actualizada. Ya podes iniciar sesion.',
+            ],
+        ]);
+    }
+
+    public function sendEmailVerification(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if ($user->hasVerifiedEmail()) {
+            return response()->json([
+                'data' => ['message' => 'Tu email ya esta verificado.'],
+            ]);
+        }
+
+        $user->sendEmailVerificationNotification();
+
+        return response()->json([
+            'data' => ['message' => 'Te enviamos un email de verificacion.'],
+        ]);
+    }
+
+    public function verifyEmail(Request $request, int $id, string $hash)
+    {
+        $user = User::query()->findOrFail($id);
+
+        if (! hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
+            abort(403, 'El enlace de verificacion no es valido.');
+        }
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->markEmailAsVerified();
+            event(new Verified($user));
+        }
+
+        return redirect()->away($this->frontendUrl('/verificar-email?status=verified'));
+    }
+
     public function me(Request $request): JsonResponse
     {
         return response()->json([
@@ -132,6 +223,11 @@ class AuthController extends Controller
         $request->user()?->currentAccessToken()?->delete();
 
         return response()->json(['data' => ['message' => 'Sesión cerrada.']]);
+    }
+
+    private function frontendUrl(string $path = ''): string
+    {
+        return rtrim((string) config('app.frontend_url', config('app.url')), '/').$path;
     }
 
     private function uniqueSlug(string $value, string $modelClass): string

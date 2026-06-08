@@ -15,8 +15,11 @@ Route::prefix('v1')->group(function () {
     Route::post('/auth/register', [AuthController::class, 'register']);
     Route::post('/auth/register-seller', [AuthController::class, 'registerSeller']);
     Route::post('/auth/login', [AuthController::class, 'login']);
-    Route::post('/auth/password/forgot', fn () => response()->json(['data' => ['message' => 'Flujo preparado para Fase 1.']]));
-    Route::post('/auth/password/reset', fn () => response()->json(['data' => ['message' => 'Flujo preparado para Fase 1.']]));
+    Route::post('/auth/password/forgot', [AuthController::class, 'forgotPassword']);
+    Route::post('/auth/password/reset', [AuthController::class, 'resetPassword']);
+    Route::get('/auth/email/verify/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+        ->middleware('signed')
+        ->name('verification.verify');
 
     Route::get('/categories', [CatalogController::class, 'categories']);
     Route::get('/categories/{slug}', [CatalogController::class, 'category']);
@@ -34,7 +37,7 @@ Route::prefix('v1')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
-        Route::post('/auth/email/verify', fn () => response()->json(['data' => ['message' => 'Verificación preparada.']]));
+        Route::post('/auth/email/verify', [AuthController::class, 'sendEmailVerification']);
 
         Route::get('/users/me', [AuthController::class, 'me']);
 

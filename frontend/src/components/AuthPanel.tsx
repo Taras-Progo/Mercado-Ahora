@@ -266,10 +266,9 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 export function AuthPreparedFlows() {
   return (
     <section className="mt-8 grid gap-2 rounded-2xl border border-border-soft bg-cream-card p-5">
-      <h3 className="text-sm font-semibold text-stone-800">Accesos preparados</h3>
+      <h3 className="text-sm font-semibold text-stone-800">Acceso seguro</h3>
       <p className="text-xs leading-relaxed text-stone-600">
-        Verificación de email y recuperación de contraseña quedan preparadas como base técnica en Milestone 2.
-        La integración completa de envío de correos se entrega en fases posteriores.
+        La verificacion de email y la recuperacion de contrasena ya envian correos reales mediante Resend.
       </p>
       <div className="mt-1 flex flex-wrap gap-2 text-xs">
         <Link

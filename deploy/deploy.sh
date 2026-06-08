@@ -40,6 +40,7 @@ APP_ENV=production
 APP_KEY=$APP_KEY
 APP_DEBUG=false
 APP_URL=${APP_URL:-http://187.127.254.101}
+FRONTEND_URL=${FRONTEND_URL:-${APP_URL:-http://187.127.254.101}}
 APP_DOMAIN=${APP_DOMAIN:-:80}
 ACME_EMAIL=${ACME_EMAIL:-}
 
@@ -65,7 +66,14 @@ SANCTUM_STATEFUL_DOMAINS=${SANCTUM_STATEFUL_DOMAINS:-}
 CACHE_STORE=database
 QUEUE_CONNECTION=database
 FILESYSTEM_DISK=local
-MAIL_MAILER=log
+MAIL_MAILER=${MAIL_MAILER:-log}
+MAIL_HOST=${MAIL_HOST:-127.0.0.1}
+MAIL_PORT=${MAIL_PORT:-2525}
+MAIL_SCHEME=${MAIL_SCHEME:-}
+MAIL_USERNAME=${MAIL_USERNAME:-}
+MAIL_PASSWORD=${MAIL_PASSWORD:-}
+MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS:-hello@example.com}
+MAIL_FROM_NAME=${MAIL_FROM_NAME:-Mercado Ahora}
 
 NEXT_PUBLIC_API_BASE_URL=/api/v1
 NEXT_PUBLIC_STORAGE_URL=/storage
@@ -74,6 +82,10 @@ fi
 
 if [ -n "${APP_URL:-}" ]; then
     set_env_value "APP_URL" "$APP_URL"
+fi
+
+if [ -n "${FRONTEND_URL:-}" ]; then
+    set_env_value "FRONTEND_URL" "$FRONTEND_URL"
 fi
 
 if [ -n "${APP_DOMAIN:-}" ]; then
@@ -100,6 +112,13 @@ esac
 
 set_env_value "NEXT_PUBLIC_API_BASE_URL" "${NEXT_PUBLIC_API_BASE_URL:-/api/v1}"
 set_env_value "NEXT_PUBLIC_STORAGE_URL" "${NEXT_PUBLIC_STORAGE_URL:-/storage}"
+
+for mail_key in MAIL_MAILER MAIL_HOST MAIL_PORT MAIL_SCHEME MAIL_USERNAME MAIL_PASSWORD MAIL_FROM_ADDRESS MAIL_FROM_NAME; do
+    mail_value="${!mail_key:-}"
+    if [ -n "$mail_value" ]; then
+        set_env_value "$mail_key" "$mail_value"
+    fi
+done
 
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml pull postgres caddy || true
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml build

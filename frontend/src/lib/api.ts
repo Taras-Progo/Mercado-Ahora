@@ -520,6 +520,7 @@ export type SellerDashboard = {
   products_count?: number;
   active_products_count?: number;
   pending_orders_count?: number;
+  profile_completion_percent?: number;
 };
 
 export async function getSellerDashboard(): Promise<SellerDashboard> {

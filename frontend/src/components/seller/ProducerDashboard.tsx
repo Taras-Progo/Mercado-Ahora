@@ -72,7 +72,9 @@ export function ProducerDashboard() {
     dashboard.active_products_count ?? products.filter((p) => p.status === "active").length;
   const totalProducts = dashboard.products_count ?? products.length;
   const outOfStock = products.filter((p) => p.stock === 0).length;
-  const businessName = user?.producer_profile?.business_name;
+  const producerProfile = user?.producer_profile;
+  const businessName = producerProfile?.business_name;
+  const profileCompletion = dashboard.profile_completion_percent ?? profileCompletionPercent(producerProfile);
 
   const stats = [
     {
@@ -122,7 +124,7 @@ export function ProducerDashboard() {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-      <Sidebar pendingOrders={pendingOrders} />
+      <Sidebar pendingOrders={pendingOrders} profileCompletion={profileCompletion} />
 
       <div className="grid gap-6">
         <DashboardHeader name={user?.name ?? "Productor"} business={businessName} />
@@ -234,7 +236,7 @@ export function ProducerDashboard() {
   );
 }
 
-function Sidebar({ pendingOrders }: { pendingOrders: number }) {
+function Sidebar({ pendingOrders, profileCompletion }: { pendingOrders: number; profileCompletion: number }) {
   const sidebarItems: SidebarItem[] = [
     { label: "Resumen", icon: TrendingUpIcon, href: "/seller", active: true },
     { label: "Pedidos", icon: PackageIcon, href: "/seller/orders", badge: pendingOrders || undefined },
@@ -284,9 +286,9 @@ function Sidebar({ pendingOrders }: { pendingOrders: number }) {
       <div className="mt-6 rounded-xl border border-border-soft bg-cream-card p-4">
         <p className="text-sm font-semibold text-stone-800">Completá tu perfil</p>
         <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white">
-          <div className="h-full w-4/5 rounded-full bg-olive" />
+          <div className="h-full rounded-full bg-olive" style={{ width: `${profileCompletion}%` }} />
         </div>
-        <p className="mt-2 text-xs text-stone-600">80% completado</p>
+        <p className="mt-2 text-xs text-stone-600">{profileCompletion}% completado</p>
         <Link
           href="/seller/profile"
           className="mt-3 inline-flex w-full items-center justify-center rounded-full bg-olive-dark px-3 py-2 text-xs font-semibold text-white transition hover:bg-olive"
@@ -296,6 +298,39 @@ function Sidebar({ pendingOrders }: { pendingOrders: number }) {
       </div>
     </aside>
   );
+}
+
+type ProfileCompletionSource = {
+  business_name?: string;
+  province?: string;
+  city?: string;
+  description?: string;
+  production_origin?: string;
+  product_types?: string;
+  production_method?: string;
+  story?: string;
+};
+
+function profileCompletionPercent(profile?: ProfileCompletionSource | null) {
+  if (!profile) return 0;
+
+  const fields: Array<keyof ProfileCompletionSource> = [
+    "business_name",
+    "province",
+    "city",
+    "description",
+    "production_origin",
+    "product_types",
+    "production_method",
+    "story",
+  ];
+
+  const completed = fields.filter((field) => {
+    const value = profile[field];
+    return typeof value === "string" ? value.trim().length > 0 : Boolean(value);
+  }).length;
+
+  return Math.round((completed / fields.length) * 100);
 }
 
 function DashboardHeader({ name, business }: { name: string; business?: string }) {

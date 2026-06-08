@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import type { ProductImage } from "@/lib/api";
 import { deleteProductImage, imageUrl, updateProductImage, uploadProductImage } from "@/lib/api";
 import { StarIcon, XCircleIcon } from "@/components/ui/Icons";
@@ -14,7 +14,6 @@ type Props = {
 export function ProductImageUpload({ productId, images, onImagesChange }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   const handleUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,7 +41,7 @@ export function ProductImageUpload({ productId, images, onImagesChange }: Props)
         setError(err instanceof Error ? err.message : "Error al subir la imagen.");
       } finally {
         setUploading(false);
-        if (fileRef.current) fileRef.current.value = "";
+        e.currentTarget.value = "";
       }
     },
     [productId, images, onImagesChange],
@@ -77,7 +76,7 @@ export function ProductImageUpload({ productId, images, onImagesChange }: Props)
     [productId, images, onImagesChange],
   );
 
-  const emptySlots = Math.max(0, 4 - images.length);
+  const emptySlots = Math.max(0, 5 - images.length);
 
   return (
     <div>
@@ -122,47 +121,52 @@ export function ProductImageUpload({ productId, images, onImagesChange }: Props)
           </div>
         ))}
 
-        {images.length < 5 && (
-          <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-soft text-stone-400 transition hover:border-olive hover:bg-olive-muted/40 hover:text-olive">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-7 w-7">
-              {images.length === 0 ? (
-                <>
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                  <circle cx="12" cy="13" r="4" />
-                </>
-              ) : (
-                <path d="M12 5v14M5 12h14" />
-              )}
-            </svg>
-            <span className="text-center text-[11px] font-medium leading-tight">
-              {uploading
-                ? "Subiendo..."
-                : images.length === 0
-                  ? "Imagen principal (Obligatoria)"
-                  : "Agregar foto"}
-            </span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleUpload}
-              disabled={uploading}
-            />
-          </label>
-        )}
+        {Array.from({ length: emptySlots }).map((_, i) => {
+          const isPrimarySlot = images.length === 0 && i === 0;
 
-        {Array.from({ length: emptySlots }).map((_, i) => (
-          <div
-            key={`placeholder-${i}`}
-            className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-soft/60 text-stone-300"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-7 w-7">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            <span className="text-[11px] font-medium">Agregar foto</span>
-          </div>
-        ))}
+          return (
+            <label
+              key={`upload-${i}`}
+              className={`flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-soft text-stone-400 transition ${
+                uploading
+                  ? "cursor-wait opacity-70"
+                  : "cursor-pointer hover:border-olive hover:bg-olive-muted/40 hover:text-olive"
+              }`}
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                className="h-7 w-7"
+              >
+                {isPrimarySlot ? (
+                  <>
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                    <circle cx="12" cy="13" r="4" />
+                  </>
+                ) : (
+                  <path d="M12 5v14M5 12h14" />
+                )}
+              </svg>
+              <span className="text-center text-[11px] font-medium leading-tight">
+                {uploading
+                  ? "Subiendo..."
+                  : isPrimarySlot
+                    ? "Imagen principal (Obligatoria)"
+                    : "Agregar foto"}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading}
+              />
+            </label>
+          );
+        })}
       </div>
     </div>
   );
