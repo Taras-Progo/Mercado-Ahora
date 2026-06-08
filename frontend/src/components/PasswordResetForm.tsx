@@ -14,6 +14,8 @@ type Props = {
   token?: string;
 };
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function PasswordResetForm({ initialEmail = "", token }: Props) {
   const [feedback, setFeedback] = useState<{ tone: Tone; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,12 +37,25 @@ export function PasswordResetForm({ initialEmail = "", token }: Props) {
         }
       : { email: form.get("email") };
 
-    try {
-      const response = await fetch(`${API_BASE}${endpoint}`, {
+    async function sendRequest() {
+      return fetch(`${API_BASE}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(body),
       });
+    }
+
+    try {
+      let response: Response;
+
+      try {
+        response = await sendRequest();
+      } catch (error) {
+        await wait(900);
+        response = await sendRequest();
+        console.warn("Password reset request recovered after retry.", error);
+      }
+
       const json = await response.json().catch(() => null);
       const message = json?.data?.message ?? json?.message;
 
@@ -55,10 +70,16 @@ export function PasswordResetForm({ initialEmail = "", token }: Props) {
               ? "Contrasena actualizada. Ya podes iniciar sesion."
               : "Si el email existe, te enviamos instrucciones para restablecer la contrasena."),
         });
-        event.currentTarget.reset();
+        if (isResetMode) {
+          event.currentTarget.reset();
+        }
       }
-    } catch {
-      setFeedback({ tone: "error", text: "No se pudo conectar con la API." });
+    } catch (error) {
+      console.error("Password reset request failed.", error);
+      setFeedback({
+        tone: "error",
+        text: "No pudimos conectar con el servidor. Revisá tu conexión e intentá nuevamente en unos segundos.",
+      });
     } finally {
       setLoading(false);
     }
