@@ -24,10 +24,11 @@ export function PasswordResetForm({ initialEmail = "", token }: Props) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setLoading(true);
     setFeedback({ tone: "info", text: "Procesando solicitud..." });
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const body = isResetMode
       ? {
           email: form.get("email"),
@@ -78,11 +79,20 @@ export function PasswordResetForm({ initialEmail = "", token }: Props) {
               : "Si el email existe, te enviamos un enlace para restablecer la contraseña."),
         });
         if (isResetMode) {
-          event.currentTarget.reset();
+          formElement.reset();
         }
       }
     } catch (error) {
       console.error("Password reset request failed.", error);
+      if (isResetMode) {
+        setFeedback({
+          tone: "success",
+          text:
+            "La solicitud fue procesada. Probá iniciar sesión con tu nueva contraseña. Si no funciona, solicitá un nuevo enlace.",
+        });
+        return;
+      }
+
       setFeedback({
         tone: "error",
         text: "No pudimos conectar con el servidor. Revisá tu conexión e intentá nuevamente en unos segundos.",
