@@ -8,6 +8,7 @@ use App\Models\ProducerProfile;
 use App\Models\ProducerSocialLink;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class SellerController extends Controller
@@ -200,9 +201,34 @@ class SellerController extends Controller
     public function destroyProduct(Request $request, int $id): JsonResponse
     {
         $profile = $this->profileOrFail($request);
-        $profile->products()->findOrFail($id)->update(['status' => 'paused']);
+        $product = $profile->products()->with(['images'])->findOrFail($id);
 
-        return response()->json(['data' => ['message' => 'Producto pausado.']]);
+        if ($product->orderItems()->exists()) {
+            $product->update(['status' => 'paused']);
+
+            return response()->json([
+                'data' => [
+                    'action' => 'paused',
+                    'message' => 'El producto tiene pedidos asociados. Se pausó para conservar el historial.',
+                    'product' => $product->load(['category', 'images']),
+                ],
+            ]);
+        }
+
+        foreach ($product->images as $image) {
+            if (! Str::startsWith($image->path, ['http://', 'https://'])) {
+                Storage::disk('public')->delete($image->path);
+            }
+        }
+
+        $product->delete();
+
+        return response()->json([
+            'data' => [
+                'action' => 'deleted',
+                'message' => 'Producto eliminado.',
+            ],
+        ]);
     }
 
     public function publishProduct(Request $request, int $id): JsonResponse

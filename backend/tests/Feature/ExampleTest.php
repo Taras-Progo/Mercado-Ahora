@@ -414,6 +414,48 @@ class ExampleTest extends TestCase
         Storage::disk('public')->assertExists($product->images()->firstOrFail()->path);
     }
 
+    public function test_seller_can_delete_product_without_order_history(): void
+    {
+        $this->seed();
+
+        $seller = User::query()->where('email', 'verde@amanecer.com')->firstOrFail();
+        $product = $seller->producerProfile->products()->create([
+            'category_id' => Category::query()->firstOrFail()->id,
+            'name' => 'Producto eliminable',
+            'slug' => 'producto-eliminable',
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 5,
+            'unit' => 'unidad',
+            'status' => 'draft',
+        ]);
+
+        $this->actingAs($seller, 'sanctum')
+            ->deleteJson("/api/v1/seller/products/{$product->id}")
+            ->assertOk()
+            ->assertJsonPath('data.action', 'deleted');
+
+        $this->assertDatabaseMissing('products', ['id' => $product->id]);
+    }
+
+    public function test_seller_delete_product_with_order_history_pauses_it(): void
+    {
+        $this->seed();
+
+        $product = Product::query()->whereHas('orderItems')->firstOrFail();
+        $seller = $product->producerProfile->user;
+
+        $this->actingAs($seller, 'sanctum')
+            ->deleteJson("/api/v1/seller/products/{$product->id}")
+            ->assertOk()
+            ->assertJsonPath('data.action', 'paused');
+
+        $this->assertDatabaseHas('products', [
+            'id' => $product->id,
+            'status' => 'paused',
+        ]);
+    }
+
     public function test_non_admin_and_non_seller_route_guards_are_enforced(): void
     {
         $this->seed();

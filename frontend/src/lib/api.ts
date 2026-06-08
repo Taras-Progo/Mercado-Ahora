@@ -398,8 +398,14 @@ export async function updateProduct(id: number, data: Record<string, unknown>): 
   return apiAuthPatch<Product>(`/seller/products/${id}`, data);
 }
 
-export async function deleteProduct(id: number): Promise<void> {
-  await apiAuthDelete(`/seller/products/${id}`);
+export type ProductDeleteResult = {
+  action: "deleted" | "paused";
+  message: string;
+  product?: Product;
+};
+
+export async function deleteProduct(id: number): Promise<ProductDeleteResult> {
+  return apiAuthDelete<ProductDeleteResult>(`/seller/products/${id}`);
 }
 
 export async function publishProduct(id: number): Promise<Product> {

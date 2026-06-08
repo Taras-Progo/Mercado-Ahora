@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import type { Product } from "@/lib/api";
 import {
+  deleteProduct,
   getSellerProducts,
   imageUrl,
   money,
@@ -16,7 +17,7 @@ import { ProductForm } from "@/components/seller/ProductForm";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { BagIcon, CheckCircleIcon, ChevronRightIcon, ClockIcon, EyeIcon, PauseIcon, PlusIcon, SearchIcon, XCircleIcon } from "@/components/ui/Icons";
+import { BagIcon, CheckCircleIcon, ChevronRightIcon, ClockIcon, EyeIcon, PauseIcon, PlusIcon, SearchIcon, TrashIcon, XCircleIcon } from "@/components/ui/Icons";
 
 export default function SellerProductsPage() {
   return (
@@ -40,6 +41,8 @@ function SellerProductsView() {
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
@@ -63,6 +66,7 @@ function SellerProductsView() {
       setShowForm(false);
       setEditingProduct(null);
       setActionError(null);
+      setActionMessage(null);
       fetchProducts();
     },
     [fetchProducts],
@@ -71,6 +75,7 @@ function SellerProductsView() {
   const handlePublish = useCallback(
     async (id: number) => {
       setActionError(null);
+      setActionMessage(null);
       try {
         await publishProduct(id);
         fetchProducts();
@@ -84,6 +89,7 @@ function SellerProductsView() {
   const handlePause = useCallback(
     async (id: number) => {
       setActionError(null);
+      setActionMessage(null);
       try {
         await pauseProduct(id);
         fetchProducts();
@@ -98,7 +104,35 @@ function SellerProductsView() {
     setEditingProduct(product);
     setShowForm(true);
     setActionError(null);
+    setActionMessage(null);
   }, []);
+
+  const handleDelete = useCallback(
+    async (product: Product) => {
+      const confirmed = window.confirm(
+        `¿Eliminar "${product.name}"? Si tiene pedidos asociados, se pausará para conservar el historial.`,
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      setActionError(null);
+      setActionMessage(null);
+      setDeletingProductId(product.id);
+
+      try {
+        const result = await deleteProduct(product.id);
+        setActionMessage(result.message);
+        fetchProducts();
+      } catch (err) {
+        setActionError(err instanceof Error ? err.message : "Error al eliminar.");
+      } finally {
+        setDeletingProductId(null);
+      }
+    },
+    [fetchProducts],
+  );
 
   if (showForm) {
     return (
@@ -161,6 +195,9 @@ function SellerProductsView() {
 
       {actionError && (
         <p className="mt-4 text-sm font-medium text-red-600">{actionError}</p>
+      )}
+      {actionMessage && (
+        <p className="mt-4 text-sm font-medium text-olive-dark">{actionMessage}</p>
       )}
 
       {loading ? (
@@ -261,6 +298,15 @@ function SellerProductsView() {
                             <CheckCircleIcon className="h-4 w-4" />
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(product)}
+                          disabled={deletingProductId === product.id}
+                          className="rounded-lg p-2 text-stone-400 transition hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                          title="Eliminar"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
