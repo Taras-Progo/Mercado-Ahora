@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Category, Product, ProductImage } from "@/lib/api";
 import {
   createProduct,
@@ -29,9 +29,11 @@ const inputClass =
 export function ProductForm({ product, onSaved, onCancel }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
+  const [preparingPhotos, setPreparingPhotos] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const photosRef = useRef<HTMLDivElement>(null);
+  const autoDraftStartedRef = useRef(false);
   // Tracks the persisted product: the one passed in (edit mode) or the draft we
   // create on first save (create mode). Once set, the image uploader is enabled.
   const [savedProduct, setSavedProduct] = useState<Product | null>(product ?? null);
@@ -60,6 +62,37 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
         ? "otro"
         : "no";
 
+  const parsedPrice = Number.parseInt(priceCents, 10);
+  const parsedStock = Number.parseInt(stock, 10);
+  const basicInfoReady =
+    name.trim().length > 0 &&
+    Boolean(categoryId) &&
+    priceCents.trim().length > 0 &&
+    Number.isFinite(parsedPrice) &&
+    parsedPrice >= 0 &&
+    stock.trim().length > 0 &&
+    Number.isFinite(parsedStock) &&
+    parsedStock >= 0 &&
+    unit.trim().length > 0;
+
+  const productPayload = useMemo(() => {
+    const [city, ...rest] = origin.split(",").map((s) => s.trim());
+    const province = rest.join(", ") || null;
+
+    return {
+      name: name.trim(),
+      description: description.trim() || null,
+      category_id: Number.parseInt(categoryId, 10),
+      price_cents: Number.parseInt(priceCents, 10),
+      stock: Number.parseInt(stock, 10) || 0,
+      unit: unit || "unidad",
+      production_type: productionType || null,
+      delivery_type: deliveryType || null,
+      city: city || null,
+      province,
+    };
+  }, [name, description, categoryId, priceCents, stock, unit, productionType, deliveryType, origin]);
+
   const handleSave = useCallback(
     async (status: "draft" | "active") => {
       setError(null);
@@ -78,32 +111,17 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
       }
       setSaving(true);
       try {
-        const [city, ...rest] = origin.split(",").map((s) => s.trim());
-        const province = rest.join(", ") || null;
-        const data: Record<string, unknown> = {
-          name: name.trim(),
-          description: description.trim() || null,
-          category_id: parseInt(categoryId, 10),
-          price_cents: parseInt(priceCents, 10),
-          stock: parseInt(stock, 10) || 0,
-          unit: unit || "unidad",
-          production_type: productionType || null,
-          delivery_type: deliveryType || null,
-          city: city || null,
-          province,
-        };
-
         if (savedProduct) {
           // Already persisted (editing or a just-created draft): apply the chosen status.
-          const updated = await updateProduct(savedProduct.id, { ...data, status });
+          const updated = await updateProduct(savedProduct.id, { ...productPayload, status });
           onSaved(updated);
         } else {
           // First save of a brand-new product: always create as draft so the seller
           // can attach images before publishing (avoids image-less active products).
-          const created = await createProduct({ ...data, status: "draft" });
+          const created = await createProduct({ ...productPayload, status: "draft" });
           setSavedProduct(created);
           setImages(created.images ?? []);
-          setInfo("Producto creado como borrador. Agregá las fotos y luego publicalo.");
+          setInfo("Fotos habilitadas. Ya podés subir imágenes del producto.");
           window.setTimeout(() => {
             photosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
           }, 50);
@@ -114,10 +132,38 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
         setSaving(false);
       }
     },
-    [name, description, categoryId, priceCents, stock, unit, productionType, deliveryType, origin, savedProduct, onSaved],
+    [name, categoryId, priceCents, savedProduct, productPayload, onSaved],
   );
 
   const hasProduct = !!savedProduct;
+
+  useEffect(() => {
+    if (product || savedProduct || !basicInfoReady || autoDraftStartedRef.current) {
+      return;
+    }
+
+    autoDraftStartedRef.current = true;
+    setError(null);
+    setInfo(null);
+    setPreparingPhotos(true);
+
+    createProduct({ ...productPayload, status: "draft" })
+      .then((created) => {
+        setSavedProduct(created);
+        setImages(created.images ?? []);
+        setInfo("Fotos habilitadas. Ya podés subir imágenes del producto.");
+        window.setTimeout(() => {
+          photosRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 50);
+      })
+      .catch((err) => {
+        autoDraftStartedRef.current = false;
+        setError(err instanceof Error ? err.message : "No se pudo preparar la carga de fotos.");
+      })
+      .finally(() => {
+        setPreparingPhotos(false);
+      });
+  }, [product, savedProduct, basicInfoReady, productPayload]);
 
   return (
     <form className="grid gap-6" onSubmit={(e) => e.preventDefault()}>
@@ -134,53 +180,8 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
         </div>
       )}
 
-      {/* 1. Fotos del producto */}
-      <div ref={photosRef}>
-      <SectionCard number={1} title="Fotos del producto" subtitle="Subí fotos claras y reales. La primera será la imagen principal.">
-        {hasProduct && savedProduct ? (
-          <ProductImageUpload productId={savedProduct.id} images={images} onImagesChange={setImages} />
-        ) : (
-          <div>
-            <div className="grid grid-cols-2 gap-3 opacity-60 sm:grid-cols-3 lg:grid-cols-5">
-              {[0, 1, 2, 3, 4].map((i) => (
-                <div
-                  key={i}
-                  className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-soft text-stone-300"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" className="h-7 w-7">
-                    {i === 0 ? (
-                      <>
-                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
-                        <circle cx="12" cy="13" r="4" />
-                      </>
-                    ) : (
-                      <path d="M12 5v14M5 12h14" />
-                    )}
-                  </svg>
-                  <span className="text-center text-[11px] font-medium leading-tight">
-                    {i === 0 ? "Imagen principal (Obligatoria)" : "Agregar foto"}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-xs text-stone-500">
-              Completá los datos y tocá <strong>Crear y agregar fotos</strong> para habilitar la carga de imágenes.
-            </p>
-            <button
-              type="button"
-              onClick={() => handleSave("draft")}
-              disabled={saving}
-              className="mt-4 inline-flex items-center justify-center rounded-full bg-olive-dark px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-olive disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? "Creando borrador..." : "Crear borrador y habilitar fotos"}
-            </button>
-          </div>
-        )}
-      </SectionCard>
-      </div>
-
-      {/* 2. Información básica */}
-      <SectionCard number={2} title="Información básica">
+      {/* 1. Información básica */}
+      <SectionCard number={1} title="Información básica">
         <div className="grid gap-5 sm:grid-cols-2">
           <Field label="Nombre del producto" required>
             <input
@@ -271,6 +272,56 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
         </div>
       </SectionCard>
 
+      {/* 2. Fotos del producto */}
+      <div ref={photosRef}>
+        <SectionCard
+          number={2}
+          title="Fotos del producto"
+          subtitle="Subí fotos claras y reales. La primera será la imagen principal."
+        >
+          {hasProduct && savedProduct ? (
+            <ProductImageUpload productId={savedProduct.id} images={images} onImagesChange={setImages} />
+          ) : (
+            <div>
+              <div className="grid grid-cols-2 gap-3 opacity-60 sm:grid-cols-3 lg:grid-cols-5">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="flex aspect-square flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-border-soft text-stone-300"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      className="h-7 w-7"
+                    >
+                      {i === 0 ? (
+                        <>
+                          <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+                          <circle cx="12" cy="13" r="4" />
+                        </>
+                      ) : (
+                        <path d="M12 5v14M5 12h14" />
+                      )}
+                    </svg>
+                    <span className="text-center text-[11px] font-medium leading-tight">
+                      {i === 0 ? "Imagen principal (Obligatoria)" : "Agregar foto"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-stone-500">
+                {preparingPhotos
+                  ? "Preparando la carga de fotos..."
+                  : "Completá la información básica para habilitar la carga de imágenes."}
+              </p>
+            </div>
+          )}
+        </SectionCard>
+      </div>
+
       {/* 3. Descripción del producto */}
       <SectionCard
         number={3}
@@ -348,35 +399,30 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
         <button
           type="button"
           onClick={onCancel}
-          disabled={saving}
+          disabled={saving || preparingPhotos}
           className="inline-flex items-center justify-center gap-2 rounded-full border border-border-soft bg-white px-6 py-3 text-sm font-semibold text-stone-600 transition hover:bg-stone-50"
         >
           <ChevronLeftIcon className="h-4 w-4" />
           {hasProduct ? "Cerrar" : "Cancelar"}
         </button>
         {!hasProduct ? (
-          <button
-            type="button"
-            onClick={() => handleSave("draft")}
-            disabled={saving}
-            className="btn-primary inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold"
-          >
-            {saving ? "Creando..." : "Crear y agregar fotos"}
-          </button>
+          <p className="rounded-full bg-olive-muted px-5 py-3 text-center text-sm font-semibold text-olive-dark">
+            {preparingPhotos ? "Preparando fotos..." : "Completá la información básica para continuar"}
+          </p>
         ) : (
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
               onClick={() => handleSave("draft")}
-              disabled={saving}
+              disabled={saving || preparingPhotos}
               className="rounded-full border border-olive bg-white px-6 py-3 text-sm font-semibold text-olive transition hover:bg-olive-muted"
             >
-              {saving ? "Guardando..." : "Guardar borrador"}
+              {saving ? "Guardando..." : "Guardar cambios"}
             </button>
             <button
               type="button"
               onClick={() => handleSave("active")}
-              disabled={saving}
+              disabled={saving || preparingPhotos}
               className="btn-primary inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold"
             >
               {saving ? "Publicando..." : "Publicar producto"}
