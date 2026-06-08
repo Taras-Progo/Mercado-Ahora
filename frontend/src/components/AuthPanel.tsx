@@ -7,7 +7,7 @@ import { parseApiMessage, producerStatusOf, roleHome, useAuth } from "@/componen
 import { applyAsSeller, type SellerApplyPayload } from "@/lib/api";
 import { CheckCircleIcon, ClockIcon, EyeIcon, LeafIcon } from "@/components/ui/Icons";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000/api/v1";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 
 type Mode = "login" | "register" | "seller-apply";
 
