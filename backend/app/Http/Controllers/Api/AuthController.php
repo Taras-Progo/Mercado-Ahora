@@ -138,7 +138,7 @@ class AuthController extends Controller
 
         return response()->json([
             'data' => [
-                'message' => 'Si el email existe, te enviamos instrucciones para restablecer la contrasena.',
+                'message' => 'Si el email existe, te enviamos un enlace para restablecer la contraseña.',
             ],
         ]);
     }
@@ -167,13 +167,13 @@ class AuthController extends Controller
 
         if ($status !== Password::PASSWORD_RESET) {
             throw ValidationException::withMessages([
-                'email' => ['El enlace de recuperacion no es valido o ya vencio.'],
+                'email' => ['El enlace de recuperación no es válido o ya venció.'],
             ]);
         }
 
         return response()->json([
             'data' => [
-                'message' => 'Contrasena actualizada. Ya podes iniciar sesion.',
+                'message' => 'Contraseña actualizada. Ya podés iniciar sesión.',
             ],
         ]);
     }

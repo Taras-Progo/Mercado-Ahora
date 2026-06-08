@@ -521,7 +521,7 @@ class ExampleTest extends TestCase
 
         $this->postJson('/api/v1/auth/password/forgot', ['email' => $buyer->email])
             ->assertOk()
-            ->assertJsonPath('data.message', 'Si el email existe, te enviamos instrucciones para restablecer la contrasena.');
+            ->assertJsonPath('data.message', 'Si el email existe, te enviamos un enlace para restablecer la contraseña.');
 
         $resetToken = Password::broker()->createToken($buyer);
 
@@ -532,7 +532,7 @@ class ExampleTest extends TestCase
             'password_confirmation' => 'new-password-123',
         ])
             ->assertOk()
-            ->assertJsonPath('data.message', 'Contrasena actualizada. Ya podes iniciar sesion.');
+            ->assertJsonPath('data.message', 'Contraseña actualizada. Ya podés iniciar sesión.');
 
         $this->postJson('/api/v1/auth/login', [
             'email' => $buyer->email,
