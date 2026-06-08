@@ -2,8 +2,6 @@
 
 import { FormEvent, useState } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
-
 const inputClass =
   "w-full rounded-xl border border-border-soft bg-white px-4 py-3 text-sm text-stone-800 outline-none transition focus:border-olive focus:ring-2 focus:ring-olive/20 placeholder:text-stone-400";
 
@@ -27,7 +25,6 @@ export function PasswordResetForm({ initialEmail = "", token }: Props) {
     setFeedback({ tone: "info", text: "Procesando solicitud..." });
 
     const form = new FormData(event.currentTarget);
-    const endpoint = isResetMode ? "/auth/password/reset" : "/auth/password/forgot";
     const body = isResetMode
       ? {
           email: form.get("email"),
@@ -38,7 +35,7 @@ export function PasswordResetForm({ initialEmail = "", token }: Props) {
       : { email: form.get("email") };
 
     async function sendRequest() {
-      return fetch(`${API_BASE}${endpoint}`, {
+      return fetch("/recuperar/api", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(body),
