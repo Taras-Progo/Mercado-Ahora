@@ -23,5 +23,6 @@ mercadoahora.com.ar {
 }
 
 www.mercadoahora.com.ar {
+    tls internal
     redir https://mercadoahora.com.ar{uri} permanent
 }
