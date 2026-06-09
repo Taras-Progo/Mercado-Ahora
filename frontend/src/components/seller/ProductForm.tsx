@@ -40,7 +40,9 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
   const [name, setName] = useState(product?.name ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
   const [categoryId, setCategoryId] = useState(product?.category_id?.toString() ?? "");
-  const [priceCents, setPriceCents] = useState(product?.price_cents?.toString() ?? "");
+  const [pricePesos, setPricePesos] = useState(
+    product?.price_cents != null ? String(Math.round(product.price_cents / 100)) : "",
+  );
   const [stock, setStock] = useState(product?.stock?.toString() ?? "0");
   const [unit, setUnit] = useState(product?.unit ?? "unidad");
   const [productionType, setProductionType] = useState(product?.production_type ?? "organico");
@@ -48,26 +50,18 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
   const [origin, setOrigin] = useState(
     product?.city ? [product.city, product.province].filter(Boolean).join(", ") : "",
   );
-  const [availability, setAvailability] = useState("");
   const [images, setImages] = useState<ProductImage[]>(product?.images ?? []);
 
   useEffect(() => {
     getCategories().then(setCategories);
   }, []);
 
-  const organicValue =
-    productionType === "organico" || productionType === "agroecologico"
-      ? "si"
-      : productionType === ""
-        ? "otro"
-        : "no";
-
-  const parsedPrice = Number.parseInt(priceCents, 10);
+  const parsedPrice = Number.parseFloat(pricePesos);
   const parsedStock = Number.parseInt(stock, 10);
   const basicInfoReady =
     name.trim().length > 0 &&
     Boolean(categoryId) &&
-    priceCents.trim().length > 0 &&
+    pricePesos.trim().length > 0 &&
     Number.isFinite(parsedPrice) &&
     parsedPrice >= 0 &&
     stock.trim().length > 0 &&
@@ -83,7 +77,7 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
       name: name.trim(),
       description: description.trim() || null,
       category_id: Number.parseInt(categoryId, 10),
-      price_cents: Number.parseInt(priceCents, 10),
+      price_cents: Math.round(Number.parseFloat(pricePesos) * 100),
       stock: Number.parseInt(stock, 10) || 0,
       unit: unit || "unidad",
       production_type: productionType || null,
@@ -91,7 +85,7 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
       city: city || null,
       province,
     };
-  }, [name, description, categoryId, priceCents, stock, unit, productionType, deliveryType, origin]);
+  }, [name, description, categoryId, pricePesos, stock, unit, productionType, deliveryType, origin]);
 
   const handleSave = useCallback(
     async (status: "draft" | "active") => {
@@ -105,7 +99,7 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
         setError("Seleccioná una categoría.");
         return;
       }
-      if (!priceCents || parseInt(priceCents, 10) < 0) {
+      if (!pricePesos || Number.parseFloat(pricePesos) < 0) {
         setError("El precio debe ser un número válido.");
         return;
       }
@@ -132,7 +126,7 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
         setSaving(false);
       }
     },
-    [name, categoryId, priceCents, savedProduct, productPayload, onSaved],
+    [name, categoryId, pricePesos, savedProduct, productPayload, onSaved],
   );
 
   const hasProduct = !!savedProduct;
@@ -217,15 +211,18 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
               <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-sm text-stone-400">$</span>
               <input
                 type="number"
-                value={priceCents}
-                onChange={(e) => setPriceCents(e.target.value)}
+                value={pricePesos}
+                onChange={(e) => setPricePesos(e.target.value)}
                 min="0"
+                step="0.01"
                 placeholder="0,00"
                 className={`${inputClass} pl-8`}
               />
             </div>
-            {priceCents && !isNaN(parseInt(priceCents, 10)) && (
-              <p className="mt-1 text-xs font-medium text-olive">{money(parseInt(priceCents, 10))} (ingresá el valor en centavos)</p>
+            {pricePesos && !Number.isNaN(Number.parseFloat(pricePesos)) && (
+              <p className="mt-1 text-xs font-medium text-olive">
+                {money(Math.round(Number.parseFloat(pricePesos) * 100))} (ingresá el precio en pesos argentinos)
+              </p>
             )}
           </Field>
           <Field label="Unidad de medida" required>
@@ -246,28 +243,6 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
               placeholder="Ej: 10 unidades, 5 kg, etc."
               className={inputClass}
             />
-          </Field>
-          <Field label="¿Es orgánico / agroecológico?">
-            <div className="flex flex-wrap items-center gap-6 pt-2">
-              {[
-                { value: "si", label: "Sí" },
-                { value: "no", label: "No" },
-                { value: "otro", label: "Otro" },
-              ].map((opt) => (
-                <label key={opt.value} className="inline-flex cursor-pointer items-center gap-2 text-sm text-stone-700">
-                  <input
-                    type="radio"
-                    name="organic"
-                    checked={organicValue === opt.value}
-                    onChange={() =>
-                      setProductionType(opt.value === "si" ? "organico" : opt.value === "no" ? "natural" : "")
-                    }
-                    className="h-4 w-4 accent-olive"
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
           </Field>
         </div>
       </SectionCard>
@@ -359,14 +334,6 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
                 </option>
               ))}
             </select>
-          </Field>
-          <Field label="Fecha de disponibilidad">
-            <input
-              type="date"
-              value={availability}
-              onChange={(e) => setAvailability(e.target.value)}
-              className={inputClass}
-            />
           </Field>
           <Field label="Envíos / Entregas">
             <select value={deliveryType} onChange={(e) => setDeliveryType(e.target.value)} className={inputClass}>

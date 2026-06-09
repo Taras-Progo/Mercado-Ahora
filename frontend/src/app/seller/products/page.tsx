@@ -17,7 +17,8 @@ import { ProductForm } from "@/components/seller/ProductForm";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { BagIcon, CheckCircleIcon, ChevronRightIcon, ClockIcon, EyeIcon, PauseIcon, PlusIcon, SearchIcon, TrashIcon, XCircleIcon } from "@/components/ui/Icons";
+import { SellerBackLink } from "@/components/seller/SellerBackLink";
+import { BagIcon, CheckCircleIcon, ChevronRightIcon, ClockIcon, EditIcon, EyeIcon, PauseIcon, PlusIcon, TrashIcon, XCircleIcon } from "@/components/ui/Icons";
 
 export default function SellerProductsPage() {
   return (
@@ -137,6 +138,7 @@ function SellerProductsView() {
   if (showForm) {
     return (
       <div>
+        <SellerBackLink className="mb-3" />
         <button
           type="button"
           onClick={() => {
@@ -174,6 +176,7 @@ function SellerProductsView() {
 
   return (
     <div>
+      <SellerBackLink className="mb-6" />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="font-serif text-2xl font-bold text-stone-900">Mis productos</h2>
@@ -246,7 +249,12 @@ function SellerProductsView() {
                             <BagIcon className="h-4 w-4" />
                           </span>
                         )}
-                        <span className="font-semibold text-stone-800">{product.name}</span>
+                        <Link
+                          href={`/products/${product.slug}`}
+                          className="font-semibold text-stone-800 transition hover:text-olive"
+                        >
+                          {product.name}
+                        </Link>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-stone-600">{product.category?.name ?? "—"}</td>
@@ -276,7 +284,7 @@ function SellerProductsView() {
                           className="rounded-lg p-2 text-stone-400 transition hover:text-olive"
                           title="Editar"
                         >
-                          <SearchIcon className="h-4 w-4" />
+                          <EditIcon className="h-4 w-4" />
                         </button>
                         {product.status === "active" && (
                           <button

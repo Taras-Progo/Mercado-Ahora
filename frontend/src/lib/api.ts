@@ -19,9 +19,22 @@ export type ProducerProfile = {
   production_origin?: string;
   product_types?: string;
   production_method?: string;
+  production_since?: string;
   story?: string;
+  digital_presence_notes?: string;
+  logo_path?: string | null;
   products_count?: number;
   products?: Product[];
+  social_links?: ProducerSocialLink[];
+  socialLinks?: ProducerSocialLink[];
+};
+
+export type ProducerSocialLink = {
+  id: number;
+  producer_profile_id: number;
+  platform: string;
+  url: string;
+  is_visible: boolean;
 };
 
 export type ProductImage = {
@@ -561,6 +574,50 @@ export type SellerApplyResult = {
 // Upgrades the currently logged-in account to a producer (no new email/password).
 export async function applyAsSeller(payload: SellerApplyPayload): Promise<SellerApplyResult> {
   return apiAuthPost<SellerApplyResult>("/seller/apply", payload);
+}
+
+// ---- Seller Profile API ----
+
+export type SellerProfilePayload = {
+  business_name: string;
+  province?: string;
+  city?: string;
+  description?: string;
+  production_practices?: string;
+  production_origin?: string;
+  product_types?: string;
+  production_method?: string;
+  production_since?: string;
+  story?: string;
+  digital_presence_notes?: string;
+};
+
+export async function getSellerProfile(): Promise<ProducerProfile | null> {
+  try {
+    return await apiAuthGet<ProducerProfile | null>("/seller/profile");
+  } catch {
+    return null;
+  }
+}
+
+export async function saveSellerProfile(payload: SellerProfilePayload): Promise<ProducerProfile> {
+  return apiAuthPatch<ProducerProfile>("/seller/profile", payload);
+}
+
+export async function getSellerSocialLinks(): Promise<ProducerSocialLink[]> {
+  try {
+    return await apiAuthGet<ProducerSocialLink[]>("/seller/social-links");
+  } catch {
+    return [];
+  }
+}
+
+export async function saveSellerSocialLink(payload: {
+  platform: string;
+  url: string;
+  is_visible?: boolean;
+}): Promise<ProducerSocialLink> {
+  return apiAuthPost<ProducerSocialLink>("/seller/social-links", payload);
 }
 
 // ---- Seller Orders API ----

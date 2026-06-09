@@ -53,16 +53,16 @@ export function AdminUsers() {
   const submitReset = async () => {
     if (!selected) return;
     if (password.length < 8) {
-      setFeedback({ tone: "error", text: "La contrasena temporal debe tener al menos 8 caracteres." });
+      setFeedback({ tone: "error", text: "La contraseña temporal debe tener al menos 8 caracteres." });
       return;
     }
     if (password !== passwordConfirmation) {
-      setFeedback({ tone: "error", text: "Las contrasenas no coinciden." });
+      setFeedback({ tone: "error", text: "Las contraseñas no coinciden." });
       return;
     }
 
     setBusy(true);
-    setFeedback({ tone: "info", text: "Restableciendo contrasena..." });
+    setFeedback({ tone: "info", text: "Restableciendo contraseña..." });
     try {
       const result = await resetAdminUserPassword(selected.id, password, passwordConfirmation);
       setFeedback({ tone: "success", text: result.message });
@@ -73,7 +73,7 @@ export function AdminUsers() {
     } catch (err) {
       setFeedback({
         tone: "error",
-        text: err instanceof Error ? err.message : "No se pudo restablecer la contrasena.",
+        text: err instanceof Error ? err.message : "No se pudo restablecer la contraseña.",
       });
     } finally {
       setBusy(false);
@@ -93,7 +93,7 @@ export function AdminUsers() {
       </div>
 
       <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-        Esta es una herramienta temporal hasta activar Resend. Solo permite restablecer contrasenas de usuarios activos y cierra sus sesiones existentes.
+        Herramienta administrativa de respaldo para restablecer contraseñas de usuarios activos. Al guardar, se cierran sus sesiones existentes.
       </div>
 
       {feedback && (
@@ -124,7 +124,7 @@ export function AdminUsers() {
         <section className="rounded-2xl border border-border-soft bg-white p-5">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-semibold text-stone-900">Restablecer contrasena</p>
+              <p className="text-sm font-semibold text-stone-900">Restablecer contraseña</p>
               <p className="text-xs text-stone-500">{selected.name} - {selected.email}</p>
             </div>
             <button
@@ -141,14 +141,14 @@ export function AdminUsers() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
-              placeholder="Nueva contrasena temporal"
+              placeholder="Nueva contraseña temporal"
               className="rounded-full border border-border-soft px-4 py-2.5 text-sm outline-none focus:border-olive focus:ring-2 focus:ring-olive/20"
             />
             <input
               type="password"
               value={passwordConfirmation}
               onChange={(event) => setPasswordConfirmation(event.target.value)}
-              placeholder="Confirmar contrasena"
+              placeholder="Confirmar contraseña"
               className="rounded-full border border-border-soft px-4 py-2.5 text-sm outline-none focus:border-olive focus:ring-2 focus:ring-olive/20"
             />
             <button

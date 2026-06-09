@@ -5,6 +5,7 @@ import Link from "next/link";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { SellerBackLink } from "@/components/seller/SellerBackLink";
 import type { Order } from "@/lib/api";
 import {
   getSellerOrders,
@@ -116,6 +117,7 @@ function SellerOrdersView() {
 
   return (
     <div>
+      <SellerBackLink className="mb-6" />
       <div className="mb-6">
         <h1 className="font-serif text-2xl font-bold text-stone-900">Pedidos recibidos</h1>
         <p className="mt-1 text-sm text-stone-600">

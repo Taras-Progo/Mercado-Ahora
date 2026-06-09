@@ -2,8 +2,11 @@
     admin off
 }
 
-{$APP_DOMAIN::80} {
+{$APP_DOMAIN::80}, www.mercadoahora.com.ar {
     encode gzip zstd
+
+    @www host www.mercadoahora.com.ar
+    redir @www https://mercadoahora.com.ar{uri} permanent
 
     handle /api/* {
         reverse_proxy backend:8000

@@ -40,6 +40,7 @@ export function HeroSection() {
       className="relative min-h-[420px] overflow-hidden bg-cream bg-cover bg-[center_right] bg-no-repeat sm:min-h-[480px] lg:min-h-[540px]"
       style={{ backgroundImage: HERO_BACKGROUND }}
     >
+      <div className="absolute inset-0 bg-cream/65 backdrop-blur-[1px] sm:hidden" aria-hidden />
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-10 lg:py-16">
         <div className="max-w-xl lg:max-w-[48%]">
           <h1 className="font-serif text-4xl leading-[1.15] tracking-tight text-foreground sm:text-5xl lg:text-[3.25rem]">
