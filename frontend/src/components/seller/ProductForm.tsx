@@ -87,8 +87,11 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
     };
   }, [name, description, categoryId, pricePesos, stock, unit, productionType, deliveryType, origin]);
 
+  const persistedStatus = savedProduct?.status ?? product?.status ?? "draft";
+  const isPublished = persistedStatus === "active";
+
   const handleSave = useCallback(
-    async (status: "draft" | "active") => {
+    async (status?: string) => {
       setError(null);
       setInfo(null);
       if (!name.trim()) {
@@ -106,8 +109,10 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
       setSaving(true);
       try {
         if (savedProduct) {
-          // Already persisted (editing or a just-created draft): apply the chosen status.
-          const updated = await updateProduct(savedProduct.id, { ...productPayload, status });
+          // Already persisted: keep the current publication state unless the
+          // seller explicitly chooses to publish a draft/paused product.
+          const updated = await updateProduct(savedProduct.id, { ...productPayload, status: status ?? persistedStatus });
+          setSavedProduct(updated);
           onSaved(updated);
         } else {
           // First save of a brand-new product: always create as draft so the seller
@@ -126,7 +131,7 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
         setSaving(false);
       }
     },
-    [name, categoryId, pricePesos, savedProduct, productPayload, onSaved],
+    [name, categoryId, pricePesos, savedProduct, productPayload, persistedStatus, onSaved],
   );
 
   const hasProduct = !!savedProduct;
@@ -380,21 +385,23 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
           <div className="flex flex-wrap gap-3">
             <button
               type="button"
-              onClick={() => handleSave("draft")}
+              onClick={() => handleSave()}
               disabled={saving || preparingPhotos}
               className="rounded-full border border-olive bg-white px-6 py-3 text-sm font-semibold text-olive transition hover:bg-olive-muted"
             >
               {saving ? "Guardando..." : "Guardar cambios"}
             </button>
-            <button
-              type="button"
-              onClick={() => handleSave("active")}
-              disabled={saving || preparingPhotos}
-              className="btn-primary inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold"
-            >
-              {saving ? "Publicando..." : "Publicar producto"}
-              <SendIcon className="h-4 w-4" />
-            </button>
+            {!isPublished && (
+              <button
+                type="button"
+                onClick={() => handleSave("active")}
+                disabled={saving || preparingPhotos}
+                className="btn-primary inline-flex items-center justify-center gap-2 rounded-full px-6 py-3 text-sm font-semibold"
+              >
+                {saving ? "Publicando..." : "Publicar producto"}
+                <SendIcon className="h-4 w-4" />
+              </button>
+            )}
           </div>
         )}
       </div>

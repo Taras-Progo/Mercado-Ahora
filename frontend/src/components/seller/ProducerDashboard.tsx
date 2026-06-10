@@ -146,25 +146,40 @@ export function ProducerDashboard() {
               <p className="py-4 text-sm text-stone-500">Todavía no recibiste pedidos.</p>
             ) : (
               <ul className="grid divide-y divide-border-soft">
-                {recentOrders.map((order) => (
-                  <li key={order.id} className="flex items-center justify-between gap-3 py-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-stone-800">{order.order_number}</p>
-                      <p className="text-xs text-stone-500">
-                        {order.created_at
-                          ? new Date(order.created_at).toLocaleDateString("es-AR", {
-                              day: "numeric",
-                              month: "short",
-                            })
-                          : ""}
-                      </p>
-                    </div>
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium ${orderStatusColor(order.status)}`}>
-                      {orderStatusLabel(order.status)}
-                    </span>
-                    <p className="text-sm font-bold text-olive-dark">{money(order.total_cents)}</p>
-                  </li>
-                ))}
+                {recentOrders.map((order) => {
+                  const firstItem = order.items?.[0];
+                  const extraItems = Math.max((order.items?.length ?? 0) - 1, 0);
+                  const productLabel = firstItem
+                    ? `${firstItem.product_name}${extraItems > 0 ? ` + ${extraItems} mas` : ""}`
+                    : "Producto sin detalle";
+
+                  return (
+                    <li key={order.id} className="grid gap-2 py-3">
+                      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-stone-800">
+                            {order.buyer?.name ?? "Comprador"}
+                          </p>
+                          <p className="truncate text-xs text-stone-500">{productLabel}</p>
+                        </div>
+                        <p className="shrink-0 text-sm font-bold text-olive-dark">{money(order.total_cents)}</p>
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${orderStatusColor(order.status)}`}>
+                          {orderStatusLabel(order.status)}
+                        </span>
+                        <span className="text-xs text-stone-500">
+                          {order.created_at
+                            ? new Date(order.created_at).toLocaleDateString("es-AR", {
+                                day: "numeric",
+                                month: "short",
+                              })
+                            : ""}
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </DashboardCard>

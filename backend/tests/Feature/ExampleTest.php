@@ -8,6 +8,8 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ProducerProfile;
 use App\Models\User;
+use App\Models\ProductImage;
+use App\Notifications\FrontendResetPasswordNotification;
 use App\Notifications\FrontendVerifyEmailNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -44,6 +46,155 @@ class ExampleTest extends TestCase
             ->assertJsonFragment(['name' => 'Miel natural de monte']);
     }
 
+    public function test_public_product_search_is_case_insensitive_and_returns_images_for_active_products(): void
+    {
+        $category = Category::query()->create([
+            'name' => 'Alimentos naturales',
+            'slug' => 'alimentos-naturales',
+        ]);
+
+        $seller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+
+        $profile = ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Apiario del Valle',
+            'slug' => 'apiario-del-valle',
+            'status' => 'active',
+        ]);
+
+        $activeProduct = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Miel Artesanal',
+            'slug' => 'miel-artesanal',
+            'description' => 'Miel pura de monte.',
+            'price_cents' => 500000,
+            'currency' => 'ARS',
+            'stock' => 7,
+            'unit' => 'frasco',
+            'status' => 'active',
+        ]);
+
+        ProductImage::query()->create([
+            'product_id' => $activeProduct->id,
+            'path' => 'products/miel-artesanal.jpg',
+            'is_primary' => false,
+            'sort_order' => 0,
+        ]);
+
+        foreach (['draft', 'paused'] as $status) {
+            Product::query()->create([
+                'producer_profile_id' => $profile->id,
+                'category_id' => $category->id,
+                'name' => "Miel {$status}",
+                'slug' => "miel-{$status}",
+                'price_cents' => 100000,
+                'currency' => 'ARS',
+                'stock' => 1,
+                'unit' => 'frasco',
+                'status' => $status,
+            ]);
+        }
+
+        $this->getJson('/api/v1/products?q=miel')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Miel Artesanal'])
+            ->assertJsonFragment(['path' => 'products/miel-artesanal.jpg'])
+            ->assertJsonMissing(['name' => 'Miel draft'])
+            ->assertJsonMissing(['name' => 'Miel paused']);
+    }
+
+    public function test_catalog_filters_return_only_active_product_provinces_with_counts(): void
+    {
+        $food = Category::query()->create([
+            'name' => 'Alimentos naturales',
+            'slug' => 'alimentos-naturales',
+        ]);
+        $crafts = Category::query()->create([
+            'name' => 'Artesanias',
+            'slug' => 'artesanias',
+        ]);
+
+        $seller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+
+        $profile = ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Apiario Cordoba',
+            'slug' => 'apiario-cordoba',
+            'status' => 'active',
+        ]);
+
+        $base = [
+            'producer_profile_id' => $profile->id,
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 5,
+            'unit' => 'unidad',
+        ];
+
+        Product::query()->create($base + [
+            'category_id' => $food->id,
+            'name' => 'Miel de monte',
+            'slug' => 'miel-de-monte',
+            'province' => ' Córdoba ',
+            'status' => 'active',
+        ]);
+        Product::query()->create($base + [
+            'category_id' => $food->id,
+            'name' => 'Miel cremosa',
+            'slug' => 'miel-cremosa',
+            'province' => 'Córdoba',
+            'status' => 'active',
+        ]);
+        Product::query()->create($base + [
+            'category_id' => $crafts->id,
+            'name' => 'Tabla artesanal',
+            'slug' => 'tabla-artesanal',
+            'province' => 'Mendoza',
+            'status' => 'active',
+        ]);
+        Product::query()->create($base + [
+            'category_id' => $food->id,
+            'name' => 'Miel borrador',
+            'slug' => 'miel-borrador',
+            'province' => 'Salta',
+            'status' => 'draft',
+        ]);
+        Product::query()->create($base + [
+            'category_id' => $food->id,
+            'name' => 'Miel sin provincia',
+            'slug' => 'miel-sin-provincia',
+            'province' => '   ',
+            'status' => 'active',
+        ]);
+
+        $response = $this->getJson('/api/v1/catalog/filters')
+            ->assertOk();
+
+        $this->assertSame([
+            ['value' => 'Córdoba', 'label' => 'Córdoba', 'count' => 2],
+            ['value' => 'Mendoza', 'label' => 'Mendoza', 'count' => 1],
+        ], $response->json('data.provinces'));
+
+        $this->getJson('/api/v1/catalog/filters?q=miel')
+            ->assertOk()
+            ->assertJsonPath('data.provinces', [
+                ['value' => 'Córdoba', 'label' => 'Córdoba', 'count' => 2],
+            ]);
+
+        $this->getJson('/api/v1/catalog/filters?category=artesanias')
+            ->assertOk()
+            ->assertJsonPath('data.provinces', [
+                ['value' => 'Mendoza', 'label' => 'Mendoza', 'count' => 1],
+            ]);
+    }
+
     public function test_buyer_can_login_and_add_product_to_cart(): void
     {
         $this->seed();
@@ -76,6 +227,42 @@ class ExampleTest extends TestCase
         ])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('email');
+    }
+
+    public function test_auth_me_returns_compact_user_payload_with_seller_profile_summary(): void
+    {
+        $seller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+            'phone' => '+54 9 351 555 1234',
+        ]);
+
+        ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Apiario del Valle',
+            'slug' => 'apiario-del-valle',
+            'description' => 'Descripcion larga que no debe viajar en cada validacion de sesion.',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($seller, 'sanctum')
+            ->getJson('/api/v1/auth/me')
+            ->assertOk()
+            ->assertJsonPath('data.id', $seller->id)
+            ->assertJsonPath('data.email', $seller->email)
+            ->assertJsonPath('data.role', 'seller')
+            ->assertJsonPath('data.status', 'active')
+            ->assertJsonPath('data.producer_profile.business_name', 'Apiario del Valle')
+            ->assertJsonPath('data.producer_profile.slug', 'apiario-del-valle')
+            ->assertJsonMissingPath('data.password')
+            ->assertJsonMissingPath('data.producer_profile.description');
+    }
+
+    public function test_auth_me_rejects_invalid_token(): void
+    {
+        $this->withHeader('Authorization', 'Bearer invalid-token')
+            ->getJson('/api/v1/auth/me')
+            ->assertUnauthorized();
     }
 
     public function test_seller_can_access_dashboard(): void
@@ -508,6 +695,41 @@ class ExampleTest extends TestCase
             ->assertRedirect('http://localhost/verificar-email?status=verified');
 
         $this->assertNotNull($buyer->fresh()->email_verified_at);
+    }
+
+    public function test_auth_emails_are_branded_and_fully_spanish(): void
+    {
+        config(['app.frontend_url' => 'https://mercadoahora.com.ar']);
+
+        $buyer = User::factory()->create([
+            'name' => 'Gabriel',
+            'email' => 'gabriel@example.com',
+            'role' => 'buyer',
+            'status' => 'active',
+        ]);
+
+        $resetMail = (new FrontendResetPasswordNotification('reset-token-123'))->toMail($buyer);
+        $resetHtml = (string) $resetMail->render();
+
+        $this->assertSame('Restablecé tu contraseña en Mercado Ahora', $resetMail->subject);
+        $this->assertStringContainsString('Creá una nueva contraseña', $resetHtml);
+        $this->assertStringContainsString('Crear nueva contraseña', $resetHtml);
+        $this->assertStringContainsString('Si el botón no abre correctamente', $resetHtml);
+        $this->assertStringContainsString('reset-token-123', $resetHtml);
+        $this->assertStringContainsString('/brand/mercado-ahora-logo.png', $resetHtml);
+        $this->assertStringContainsString('Productos reales, productores locales y compras más conscientes.', $resetHtml);
+        $this->assertStringNotContainsString('Regards', $resetHtml);
+        $this->assertStringNotContainsString("If you're having trouble clicking", $resetHtml);
+
+        $verifyMail = (new FrontendVerifyEmailNotification())->toMail($buyer);
+        $verifyHtml = (string) $verifyMail->render();
+
+        $this->assertSame('Verificá tu email en Mercado Ahora', $verifyMail->subject);
+        $this->assertStringContainsString('Verificá tu email', $verifyHtml);
+        $this->assertStringContainsString('Verificar mi email', $verifyHtml);
+        $this->assertStringContainsString('Mercado Ahora', $verifyHtml);
+        $this->assertStringNotContainsString('Regards', $verifyHtml);
+        $this->assertStringNotContainsString("If you're having trouble clicking", $verifyHtml);
     }
 
     public function test_password_reset_sends_email_and_updates_password(): void

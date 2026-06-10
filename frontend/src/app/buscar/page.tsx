@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ProductCard } from "@/components/ui/ProductCard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { getCategories, getProducts } from "@/lib/api";
+import { getCatalogFilters, getCategories, getProducts } from "@/lib/api";
 import { SearchIcon } from "@/components/ui/Icons";
 
 export default async function BuscarPage({
@@ -14,16 +14,24 @@ export default async function BuscarPage({
   const q = params.q?.trim() ?? "";
   const category = params.category?.trim() ?? "";
   const province = params.province?.trim() ?? "";
-  const [products, categories] = await Promise.all([
-    getProducts({
-      ...(q ? { q } : {}),
-      ...(category ? { category } : {}),
-      ...(province ? { province } : {}),
-    }),
+  const productParams = {
+    ...(q ? { q } : {}),
+    ...(category ? { category } : {}),
+    ...(province ? { province } : {}),
+  };
+  const filterParams = {
+    ...(q ? { q } : {}),
+    ...(category ? { category } : {}),
+  };
+
+  const [products, categories, filters] = await Promise.all([
+    getProducts(productParams),
     getCategories(),
+    getCatalogFilters(filterParams),
   ]);
 
   const title = q ? `Resultados para "${q}"` : "Buscar en Mercado Ahora";
+  const provinceOptions = filters.provinces;
 
   return (
     <>
@@ -39,7 +47,7 @@ export default async function BuscarPage({
 
             <form
               action="/buscar"
-              className="mt-7 grid gap-3 rounded-3xl border border-border-soft bg-white p-3 shadow-sm lg:grid-cols-[1fr_220px_180px_auto]"
+              className="mt-7 grid gap-3 rounded-3xl border border-border-soft bg-white p-3 shadow-sm lg:grid-cols-[1fr_220px_220px_auto]"
             >
               <label className="flex min-w-0 items-center gap-3 rounded-2xl bg-cream-card px-4">
                 <SearchIcon className="h-5 w-5 shrink-0 text-brown-icon" />
@@ -62,12 +70,21 @@ export default async function BuscarPage({
                   </option>
                 ))}
               </select>
-              <input
+              <select
                 name="province"
                 defaultValue={province}
-                placeholder="Provincia"
-                className="rounded-2xl border border-border-soft bg-white px-4 py-3 text-sm text-foreground outline-none placeholder:text-brown-muted/55 focus:border-olive focus:ring-2 focus:ring-olive/20"
-              />
+                disabled={provinceOptions.length === 0}
+                className="rounded-2xl border border-border-soft bg-white px-4 py-3 text-sm text-foreground outline-none focus:border-olive focus:ring-2 focus:ring-olive/20 disabled:cursor-not-allowed disabled:bg-cream-card disabled:text-brown-muted/60"
+              >
+                <option value="">
+                  {provinceOptions.length === 0 ? "Sin provincias disponibles" : "Todas las provincias"}
+                </option>
+                {provinceOptions.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label} ({item.count})
+                  </option>
+                ))}
+              </select>
               <button type="submit" className="btn-primary rounded-full px-7 py-3 text-sm font-semibold">
                 Buscar
               </button>

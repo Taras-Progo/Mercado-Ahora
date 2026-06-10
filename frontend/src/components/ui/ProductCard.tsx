@@ -6,7 +6,7 @@ import { ecoColor, ecoLabel, imageUrl, money, productionTypeLabel } from "@/lib/
 import { HeartIcon, MapPinIcon } from "@/components/ui/Icons";
 
 export function ProductCard({ product }: { product: Product }) {
-  const primaryImage = product.images?.find((img) => img.is_primary);
+  const primaryImage = product.images?.find((img) => img.is_primary) ?? product.images?.[0];
   const imageSrc = primaryImage ? imageUrl(primaryImage.path) : undefined;
   const location = product.city ?? product.province ?? product.producerProfile?.city ?? product.producer_profile?.city ?? "";
 

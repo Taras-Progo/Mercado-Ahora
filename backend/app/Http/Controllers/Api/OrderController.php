@@ -115,7 +115,7 @@ class OrderController extends Controller
 
         return response()->json([
             'data' => Order::query()
-                ->with('items.product')
+                ->with('buyer', 'items.product')
                 ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
                 ->latest()
                 ->get(),

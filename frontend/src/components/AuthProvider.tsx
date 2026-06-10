@@ -5,6 +5,7 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useState 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 const TOKEN_KEY = "mercado_token";
 const USER_KEY = "mercado_user";
+const AUTH_TIMEOUT_MS = 5000;
 
 export type UserRole = "buyer" | "seller" | "admin";
 
@@ -12,6 +13,7 @@ export type ProducerProfileSummary = {
   id: number;
   status: "pending" | "active" | "rejected";
   business_name?: string;
+  slug?: string;
 };
 
 export type AuthUser = {
@@ -19,6 +21,7 @@ export type AuthUser = {
   name: string;
   email: string;
   role: UserRole;
+  status?: string;
   email_verified_at?: string | null;
   producer_profile?: ProducerProfileSummary | null;
   producerProfile?: ProducerProfileSummary | null;
@@ -28,6 +31,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
   ready: boolean;
+  validating: boolean;
   login: (token: string, user: AuthUser) => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -39,22 +43,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [validating, setValidating] = useState(false);
 
   const refresh = useCallback(async () => {
     await Promise.resolve();
     const storedToken = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
+    const cachedUser = readCachedUser();
+
     if (!storedToken) {
+      setUser(null);
+      setToken(null);
+      setValidating(false);
       setReady(true);
       return;
     }
 
     setToken(storedToken);
+    if (cachedUser) {
+      setUser(cachedUser);
+      setReady(true);
+    }
+
+    setValidating(true);
 
     try {
-      const response = await fetch(`${API_BASE}/auth/me`, {
+      const response = await fetchWithTimeout(`${API_BASE}/auth/me`, {
         headers: { Authorization: `Bearer ${storedToken}`, Accept: "application/json" },
-      });
-      if (!response.ok) {
+      }, AUTH_TIMEOUT_MS);
+
+      if (response.status === 401 || response.status === 403) {
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(USER_KEY);
         setUser(null);
@@ -62,19 +79,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setReady(true);
         return;
       }
+
+      if (!response.ok) {
+        return;
+      }
+
       const json = await response.json();
       const nextUser: AuthUser = json.data?.user ?? json.data ?? json;
       setUser(nextUser);
       localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
     } catch {
-      const cached = localStorage.getItem(USER_KEY);
-      if (cached) {
-        try {
-          setUser(JSON.parse(cached));
-        } catch {}
+      if (cachedUser) {
+        setUser(cachedUser);
       }
     } finally {
       setReady(true);
+      setValidating(false);
     }
   }, []);
 
@@ -89,6 +109,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
     setToken(nextToken);
     setUser(nextUser);
+    setReady(true);
+    setValidating(false);
   }, []);
 
   const logout = useCallback(async () => {
@@ -105,10 +127,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(USER_KEY);
     setToken(null);
     setUser(null);
+    setReady(true);
+    setValidating(false);
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, ready, login, logout, refresh }}>
+    <AuthContext.Provider value={{ user, token, ready, validating, login, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );
@@ -144,4 +168,29 @@ export async function parseApiMessage(response: Response) {
     if (typeof json.data?.message === "string") return json.data.message;
   } catch {}
   return `Error ${response.status}`;
+}
+
+function readCachedUser(): AuthUser | null {
+  if (typeof window === "undefined") return null;
+
+  const cached = localStorage.getItem(USER_KEY);
+  if (!cached) return null;
+
+  try {
+    return JSON.parse(cached) as AuthUser;
+  } catch {
+    localStorage.removeItem(USER_KEY);
+    return null;
+  }
+}
+
+async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }

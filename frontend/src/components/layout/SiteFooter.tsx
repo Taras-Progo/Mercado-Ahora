@@ -28,6 +28,19 @@ const nav = [
   },
 ];
 
+const socialLinks = [
+  {
+    label: "Instagram",
+    href: "https://www.instagram.com/mercadoahora.digital/",
+    shortLabel: "IG",
+  },
+  {
+    label: "Facebook",
+    href: "https://www.facebook.com/profile.php?id=61558092747360",
+    shortLabel: "FB",
+  },
+];
+
 export function SiteFooter() {
   return (
     <footer className="bg-[#2f3d27] text-white/85">
@@ -59,14 +72,16 @@ export function SiteFooter() {
         <div>
           <h4 className="text-sm font-semibold uppercase tracking-wider text-white">Seguinos</h4>
           <div className="mt-4 flex gap-3">
-            {["Instagram", "Facebook", "TikTok"].map((social) => (
+            {socialLinks.map((social) => (
               <Link
-                key={social}
-                href="#"
-                aria-label={social}
+                key={social.href}
+                href={social.href}
+                aria-label={social.label}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 text-xs font-semibold transition hover:bg-white/10"
               >
-                {social.slice(0, 2)}
+                {social.shortLabel}
               </Link>
             ))}
           </div>

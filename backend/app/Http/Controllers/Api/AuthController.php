@@ -36,7 +36,7 @@ class AuthController extends Controller
 
         return response()->json([
             'data' => [
-                'user' => $user,
+                'user' => $this->authUserPayload($user),
                 'token' => $user->createToken('web')->plainTextToken,
             ],
         ], 201);
@@ -90,7 +90,7 @@ class AuthController extends Controller
 
         return response()->json([
             'data' => [
-                'user' => $user->load('producerProfile'),
+                'user' => $this->authUserPayload($user),
                 'token' => $user->createToken('web')->plainTextToken,
             ],
         ], 201);
@@ -117,7 +117,7 @@ class AuthController extends Controller
 
         return response()->json([
             'data' => [
-                'user' => $user->load('producerProfile'),
+                'user' => $this->authUserPayload($user),
                 'token' => $user->createToken('web')->plainTextToken,
             ],
         ]);
@@ -214,7 +214,7 @@ class AuthController extends Controller
     public function me(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => $request->user()->load('producerProfile'),
+            'data' => $this->authUserPayload($request->user()),
         ]);
     }
 
@@ -223,6 +223,31 @@ class AuthController extends Controller
         $request->user()?->currentAccessToken()?->delete();
 
         return response()->json(['data' => ['message' => 'Sesión cerrada.']]);
+    }
+
+    private function authUserPayload(User $user): array
+    {
+        $profile = $user->relationLoaded('producerProfile')
+            ? $user->producerProfile
+            : $user->producerProfile()
+                ->select(['id', 'user_id', 'business_name', 'slug', 'status'])
+                ->first();
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+            'phone' => $user->phone,
+            'role' => $user->role,
+            'status' => $user->status,
+            'email_verified_at' => $user->email_verified_at,
+            'producer_profile' => $profile ? [
+                'id' => $profile->id,
+                'business_name' => $profile->business_name,
+                'slug' => $profile->slug,
+                'status' => $profile->status,
+            ] : null,
+        ];
     }
 
     private function frontendUrl(string $path = ''): string

@@ -10,18 +10,18 @@
     <meta name="x-apple-disable-message-reformatting">
     <title>{{ $title }}</title>
 </head>
-<body style="margin:0;padding:0;background:#f7f3ea;color:#2f211b;font-family:Arial,Helvetica,sans-serif;">
+<body style="margin:0;padding:0;background:#f6f1e8;color:#2f211b;font-family:Arial,Helvetica,sans-serif;">
     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
         {{ $preheader }}
     </div>
 
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f3ea;margin:0;padding:28px 12px;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f1e8;margin:0;padding:28px 12px;">
         <tr>
             <td align="center">
                 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#fffdf8;border:1px solid #e4d9ca;border-radius:24px;overflow:hidden;box-shadow:0 18px 45px rgba(47,33,27,0.08);">
                     <tr>
-                        <td style="padding:28px 32px 18px;background:#fffdf8;border-bottom:1px solid #ebe2d4;">
-                            <img src="{{ $logoUrl }}" width="128" alt="Mercado Ahora" style="display:block;max-width:128px;height:auto;border:0;margin:0 0 22px;">
+                        <td style="padding:30px 32px 22px;background:#fffdf8;border-bottom:1px solid #ebe2d4;">
+                            <img src="{{ $logoUrl }}" width="132" alt="Mercado Ahora" style="display:block;max-width:132px;height:auto;border:0;margin:0 0 24px;">
                             <p style="margin:0 0 10px;color:#4c693f;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">
                                 {{ $eyebrow }}
                             </p>
@@ -47,7 +47,7 @@
 
                     <tr>
                         <td align="center" style="padding:10px 32px 28px;">
-                            <a href="{{ $actionUrl }}" style="display:inline-block;background:#3f5f35;color:#ffffff;text-decoration:none;border-radius:999px;padding:15px 28px;font-size:15px;font-weight:700;">
+                            <a href="{{ $actionUrl }}" style="display:inline-block;background:#3f5f35;color:#ffffff;text-decoration:none;border-radius:999px;padding:15px 30px;font-size:15px;font-weight:700;">
                                 {{ $actionLabel }}
                             </a>
                         </td>
@@ -65,17 +65,19 @@
 
                     <tr>
                         <td style="padding:0 32px 30px;">
-                            <p style="margin:0 0 10px;color:#7a7069;font-size:13px;line-height:1.55;">
-                                {{ $fallbackLabel }}
-                            </p>
-                            <a href="{{ $actionUrl }}" style="display:block;word-break:break-all;color:#3f5f35;background:#faf7f0;border:1px solid #e6ddd1;border-radius:14px;padding:12px 14px;font-size:12px;line-height:1.55;text-decoration:none;">
-                                {{ $actionUrl }}
-                            </a>
+                            <div style="border-top:1px solid #ebe2d4;padding-top:18px;">
+                                <p style="margin:0 0 8px;color:#8a8179;font-size:12px;line-height:1.55;">
+                                    {{ $fallbackLabel }}
+                                </p>
+                                <a href="{{ $actionUrl }}" style="display:block;word-break:break-all;color:#4c693f;background:#faf7f0;border:1px solid #ebe2d4;border-radius:12px;padding:10px 12px;font-size:11px;line-height:1.55;text-decoration:none;">
+                                    {{ $actionUrl }}
+                                </a>
+                            </div>
                         </td>
                     </tr>
 
                     <tr>
-                        <td style="padding:22px 32px;background:#314d2a;color:#fffdf8;">
+                        <td style="padding:24px 32px;background:#314d2a;color:#fffdf8;">
                             <p style="margin:0 0 6px;font-size:15px;line-height:1.5;font-weight:700;">
                                 Mercado Ahora
                             </p>

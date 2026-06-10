@@ -37,10 +37,17 @@ const valueProps = [
 export function HeroSection() {
   return (
     <section
-      className="relative min-h-[420px] overflow-hidden bg-cream bg-cover bg-[center_right] bg-no-repeat sm:min-h-[480px] lg:min-h-[540px]"
+      className="relative min-h-[420px] overflow-hidden bg-cream bg-cover bg-[72%_center] bg-no-repeat sm:min-h-[480px] sm:bg-[center_right] lg:min-h-[540px]"
       style={{ backgroundImage: HERO_BACKGROUND }}
     >
-      <div className="absolute inset-0 bg-cream/65 backdrop-blur-[1px] sm:hidden" aria-hidden />
+      <div
+        className="absolute inset-0 bg-[linear-gradient(105deg,#f6efe4_0%,rgba(246,239,228,0.98)_38%,rgba(246,239,228,0.9)_62%,rgba(246,239,228,0.68)_100%)] backdrop-blur-[1.5px] sm:hidden"
+        aria-hidden
+      />
+      <div
+        className="absolute inset-0 bg-[radial-gradient(circle_at_0%_20%,rgba(255,253,248,0.96)_0%,rgba(255,253,248,0.82)_42%,rgba(255,253,248,0)_78%)] sm:hidden"
+        aria-hidden
+      />
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-10 lg:py-16">
         <div className="max-w-xl lg:max-w-[48%]">
           <h1 className="font-serif text-4xl leading-[1.15] tracking-tight text-foreground sm:text-5xl lg:text-[3.25rem]">

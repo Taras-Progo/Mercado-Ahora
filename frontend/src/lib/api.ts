@@ -68,6 +68,16 @@ export type Product = {
   images?: ProductImage[];
 };
 
+export type CatalogProvinceFilter = {
+  value: string;
+  label: string;
+  count: number;
+};
+
+export type CatalogFilters = {
+  provinces: CatalogProvinceFilter[];
+};
+
 export type Order = {
   id: number;
   order_number: string;
@@ -290,6 +300,12 @@ export async function getProducts(params?: Record<string, string>): Promise<Prod
   const response = await apiGet<{ data?: Product[] } | Product[]>(`/products${qs}`, demoProducts);
   if (Array.isArray(response)) return response;
   return response.data ?? demoProducts;
+}
+
+export async function getCatalogFilters(params?: Record<string, string>): Promise<CatalogFilters> {
+  const qs = params ? "?" + new URLSearchParams(params).toString() : "";
+  const response = await apiGet<CatalogFilters>(`/catalog/filters${qs}`, { provinces: [] });
+  return response ?? { provinces: [] };
 }
 
 export async function getProduct(slug: string): Promise<Product | undefined> {

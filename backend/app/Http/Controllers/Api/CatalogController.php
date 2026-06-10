@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Models\ProducerProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class CatalogController extends Controller
 {
@@ -34,19 +35,38 @@ class CatalogController extends Controller
         // path; otherwise fall back to the ?category= query parameter.
         $categorySlug = $slug ?? $request->query('category');
 
-        $products = Product::query()
-            ->with(['category', 'producerProfile', 'images'])
-            ->where('status', 'active')
-            ->when($request->query('q'), fn ($query, $q) => $query->where('name', 'like', "%{$q}%"))
-            ->when($categorySlug, function ($query, $slug) {
-                $query->whereHas('category', fn ($category) => $category->where('slug', $slug));
-            })
-            ->when($request->query('province'), fn ($query, $province) => $query->where('province', $province))
-            ->when($request->query('production_type'), fn ($query, $type) => $query->where('production_type', $type))
-            ->orderByDesc('created_at')
-            ->paginate(min((int) $request->query('per_page', 12), 50));
+        $productsQuery = Product::query()
+            ->with([
+                'category',
+                'producerProfile',
+                'images' => fn ($query) => $query
+                    ->orderByDesc('is_primary')
+                    ->orderBy('sort_order')
+                    ->orderBy('id'),
+            ])
+            ->orderByDesc('created_at');
+
+        $this->applyPublicProductFilters($productsQuery, $request, $categorySlug);
+
+        $products = $productsQuery->paginate(min((int) $request->query('per_page', 12), 50));
 
         return response()->json($products);
+    }
+
+    public function filters(Request $request): JsonResponse
+    {
+        $categorySlug = $request->query('category');
+        $query = Product::query()->select('province');
+
+        $this->applyPublicProductFilters($query, $request, $categorySlug, includeProvince: false);
+
+        $provinces = $this->provinceCounts($query->pluck('province'));
+
+        return response()->json([
+            'data' => [
+                'provinces' => $provinces,
+            ],
+        ]);
     }
 
     public function product(string $slug): JsonResponse
@@ -66,7 +86,14 @@ class CatalogController extends Controller
 
         return response()->json([
             'data' => Product::query()
-                ->with(['category', 'producerProfile'])
+                ->with([
+                    'category',
+                    'producerProfile',
+                    'images' => fn ($query) => $query
+                        ->orderByDesc('is_primary')
+                        ->orderBy('sort_order')
+                        ->orderBy('id'),
+                ])
                 ->where('status', 'active')
                 ->where('id', '!=', $product->id)
                 ->where('category_id', $product->category_id)
@@ -112,5 +139,55 @@ class CatalogController extends Controller
                 ])
                 ->findOrFail($id),
         ]);
+    }
+
+    private function applyPublicProductFilters($query, Request $request, ?string $categorySlug, bool $includeProvince = true): void
+    {
+        $searchTerm = trim((string) $request->query('q', ''));
+        $searchLike = '%'.strtolower($searchTerm).'%';
+
+        $query
+            ->where('status', 'active')
+            ->when($searchTerm !== '', function ($query) use ($searchLike) {
+                $query->where(function ($inner) use ($searchLike) {
+                    $inner
+                        ->whereRaw('LOWER(name) LIKE ?', [$searchLike])
+                        ->orWhereRaw('LOWER(description) LIKE ?', [$searchLike])
+                        ->orWhereHas('category', fn ($category) => $category->whereRaw('LOWER(name) LIKE ?', [$searchLike]))
+                        ->orWhereHas('producerProfile', fn ($profile) => $profile->whereRaw('LOWER(business_name) LIKE ?', [$searchLike]));
+                });
+            })
+            ->when($categorySlug, function ($query, $slug) {
+                $query->whereHas('category', fn ($category) => $category->where('slug', $slug));
+            })
+            ->when($includeProvince && $request->query('province'), function ($query, $province) {
+                $normalizedProvince = $this->normalizeProvince((string) $province);
+
+                if ($normalizedProvince !== '') {
+                    $query->whereRaw('TRIM(province) = ?', [$normalizedProvince]);
+                }
+            })
+            ->when($request->query('production_type'), fn ($query, $type) => $query->where('production_type', $type));
+    }
+
+    private function provinceCounts(Collection $rawProvinces): array
+    {
+        return $rawProvinces
+            ->map(fn ($province) => $this->normalizeProvince((string) $province))
+            ->filter()
+            ->countBy()
+            ->map(fn (int $count, string $province) => [
+                'value' => $province,
+                'label' => $province,
+                'count' => $count,
+            ])
+            ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
+    }
+
+    private function normalizeProvince(string $province): string
+    {
+        return (string) preg_replace('/\s+/', ' ', trim($province));
     }
 }

@@ -21,6 +21,7 @@ Route::prefix('v1')->group(function () {
         ->middleware('signed')
         ->name('verification.verify');
 
+    Route::get('/catalog/filters', [CatalogController::class, 'filters']);
     Route::get('/categories', [CatalogController::class, 'categories']);
     Route::get('/categories/{slug}', [CatalogController::class, 'category']);
     Route::get('/categories/{slug}/products', [CatalogController::class, 'products']);
