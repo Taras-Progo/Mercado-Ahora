@@ -76,7 +76,7 @@ export function AuthPanel({ mode }: { mode: Mode }) {
       const json = await response.json();
       const data = json.data ?? json;
       if (data.token && data.user) {
-        login(data.token, data.user);
+        login(data.token, data.user, body.remember === "on");
         setMessage({ tone: "success", text: "¡Listo! Redirigiendo..." });
         router.push(roleHome(data.user.role));
       } else {

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\Conversation;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ProducerProfile;
@@ -378,6 +379,119 @@ class ExampleTest extends TestCase
             ->assertCreated();
 
         $this->assertSame($originalStock - 2, $product->refresh()->stock);
+    }
+
+    public function test_seller_status_update_creates_history_and_buyer_sees_new_status(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $product = Product::query()->with('producerProfile.user')->where('status', 'active')->firstOrFail();
+        $seller = $product->producerProfile->user;
+
+        $orderResponse = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', [
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'delivery_type' => 'local',
+            ])
+            ->assertCreated();
+
+        $orderId = $orderResponse->json('data.id');
+
+        $this->actingAs($seller, 'sanctum')
+            ->patchJson("/api/v1/seller/orders/{$orderId}/status", [
+                'status' => 'confirmed',
+                'note' => 'Pedido confirmado por el productor.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'confirmed')
+            ->assertJsonFragment(['status' => 'confirmed'])
+            ->assertJsonFragment(['note' => 'Pedido confirmado por el productor.']);
+
+        $this->assertDatabaseHas('order_status_histories', [
+            'order_id' => $orderId,
+            'changed_by' => $seller->id,
+            'status' => 'confirmed',
+        ]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/orders')
+            ->assertOk()
+            ->assertJsonFragment(['id' => $orderId, 'status' => 'confirmed']);
+    }
+
+    public function test_seller_can_create_and_reuse_order_conversation_for_their_order(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $product = Product::query()->with('producerProfile.user')->where('status', 'active')->firstOrFail();
+        $seller = $product->producerProfile->user;
+
+        $orderResponse = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', [
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'delivery_type' => 'local',
+            ])
+            ->assertCreated();
+
+        $orderId = $orderResponse->json('data.id');
+
+        $first = $this->actingAs($seller, 'sanctum')
+            ->postJson("/api/v1/seller/orders/{$orderId}/conversation")
+            ->assertCreated()
+            ->assertJsonPath('data.order_id', $orderId)
+            ->assertJsonPath('data.buyer_id', $buyer->id)
+            ->assertJsonPath('data.producer_profile_id', $product->producer_profile_id);
+
+        $conversationId = $first->json('data.id');
+
+        $this->assertSame(1, Conversation::query()->where('order_id', $orderId)->count());
+        $this->assertDatabaseHas('messages', [
+            'conversation_id' => $conversationId,
+            'sender_id' => $seller->id,
+        ]);
+
+        $this->actingAs($seller, 'sanctum')
+            ->postJson("/api/v1/seller/orders/{$orderId}/conversation")
+            ->assertOk()
+            ->assertJsonPath('data.id', $conversationId);
+
+        $this->assertSame(1, Conversation::query()->where('order_id', $orderId)->count());
+        $this->assertSame(1, Conversation::query()->findOrFail($conversationId)->messages()->count());
+    }
+
+    public function test_seller_cannot_create_order_conversation_for_another_producer_order(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $product = Product::query()->with('producerProfile.user')->where('status', 'active')->firstOrFail();
+
+        $otherSeller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+        ProducerProfile::query()->create([
+            'user_id' => $otherSeller->id,
+            'business_name' => 'Otro Productor',
+            'slug' => 'otro-productor',
+            'status' => 'active',
+        ]);
+
+        $orderResponse = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', [
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'delivery_type' => 'local',
+            ])
+            ->assertCreated();
+
+        $this->actingAs($otherSeller, 'sanctum')
+            ->postJson('/api/v1/seller/orders/'.$orderResponse->json('data.id').'/conversation')
+            ->assertNotFound();
     }
 
     public function test_cart_and_checkout_keep_price_snapshot_when_product_price_changes(): void

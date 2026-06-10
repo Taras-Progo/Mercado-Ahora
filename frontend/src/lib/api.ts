@@ -132,10 +132,12 @@ export type Conversation = {
   buyer_id: number;
   producer_profile_id: number;
   product_id?: number | null;
+  order_id?: number | null;
   status: string;
   last_message_at?: string;
   created_at?: string;
   product?: Product;
+  order?: Order;
   producer_profile?: ProducerProfile;
   messages?: Message[];
 };
@@ -341,7 +343,7 @@ export async function getRelatedProducts(slug: string): Promise<Product[]> {
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
-  return localStorage.getItem("mercado_token");
+  return localStorage.getItem("mercado_token") ?? sessionStorage.getItem("mercado_token");
 }
 
 async function authFetch(path: string, options: RequestInit = {}): Promise<Response> {
@@ -652,6 +654,10 @@ export async function getSellerOrder(id: number): Promise<Order> {
 
 export async function updateSellerOrderStatus(id: number, status: string, note?: string): Promise<Order> {
   return apiAuthPatch<Order>(`/seller/orders/${id}/status`, { status, note });
+}
+
+export async function createSellerOrderConversation(id: number): Promise<Conversation> {
+  return apiAuthPost<Conversation>(`/seller/orders/${id}/conversation`, {});
 }
 
 export const SELLER_ORDER_STATUSES = [

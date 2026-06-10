@@ -32,7 +32,7 @@ type AuthContextValue = {
   token: string | null;
   ready: boolean;
   validating: boolean;
-  login: (token: string, user: AuthUser) => void;
+  login: (token: string, user: AuthUser, remember?: boolean) => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     await Promise.resolve();
-    const storedToken = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
+    const storedToken = readStoredToken();
     const cachedUser = readCachedUser();
 
     if (!storedToken) {
@@ -72,8 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }, AUTH_TIMEOUT_MS);
 
       if (response.status === 401 || response.status === 403) {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(USER_KEY);
+        clearStoredAuth();
         setUser(null);
         setToken(null);
         setReady(true);
@@ -87,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const json = await response.json();
       const nextUser: AuthUser = json.data?.user ?? json.data ?? json;
       setUser(nextUser);
-      localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+      writeStoredUser(nextUser);
     } catch {
       if (cachedUser) {
         setUser(cachedUser);
@@ -104,9 +103,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const login = useCallback((nextToken: string, nextUser: AuthUser) => {
-    localStorage.setItem(TOKEN_KEY, nextToken);
-    localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
+  const login = useCallback((nextToken: string, nextUser: AuthUser, remember = true) => {
+    writeStoredAuth(nextToken, nextUser, remember);
     setToken(nextToken);
     setUser(nextUser);
     setReady(true);
@@ -114,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
-    const current = typeof window !== "undefined" ? localStorage.getItem(TOKEN_KEY) : null;
+    const current = readStoredToken();
     if (current) {
       try {
         await fetch(`${API_BASE}/auth/logout`, {
@@ -123,8 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       } catch {}
     }
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    clearStoredAuth();
     setToken(null);
     setUser(null);
     setReady(true);
@@ -173,15 +170,45 @@ export async function parseApiMessage(response: Response) {
 function readCachedUser(): AuthUser | null {
   if (typeof window === "undefined") return null;
 
-  const cached = localStorage.getItem(USER_KEY);
+  const cached = localStorage.getItem(USER_KEY) ?? sessionStorage.getItem(USER_KEY);
   if (!cached) return null;
 
   try {
     return JSON.parse(cached) as AuthUser;
   } catch {
     localStorage.removeItem(USER_KEY);
+    sessionStorage.removeItem(USER_KEY);
     return null;
   }
+}
+
+function readStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
+}
+
+function writeStoredAuth(nextToken: string, nextUser: AuthUser, remember: boolean) {
+  if (typeof window === "undefined") return;
+  const target = remember ? localStorage : sessionStorage;
+  const other = remember ? sessionStorage : localStorage;
+  other.removeItem(TOKEN_KEY);
+  other.removeItem(USER_KEY);
+  target.setItem(TOKEN_KEY, nextToken);
+  target.setItem(USER_KEY, JSON.stringify(nextUser));
+}
+
+function writeStoredUser(nextUser: AuthUser) {
+  if (typeof window === "undefined") return;
+  const target = localStorage.getItem(TOKEN_KEY) ? localStorage : sessionStorage;
+  target.setItem(USER_KEY, JSON.stringify(nextUser));
+}
+
+function clearStoredAuth() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(USER_KEY);
 }
 
 async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, timeoutMs: number) {

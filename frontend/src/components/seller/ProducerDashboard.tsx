@@ -165,9 +165,12 @@ export function ProducerDashboard() {
                         <p className="shrink-0 text-sm font-bold text-olive-dark">{money(order.total_cents)}</p>
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className={`rounded-full px-3 py-1 text-xs font-medium ${orderStatusColor(order.status)}`}>
+                        <Link
+                          href={`/seller/orders?order=${order.id}`}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition hover:scale-[1.02] ${orderStatusColor(order.status)}`}
+                        >
                           {orderStatusLabel(order.status)}
-                        </span>
+                        </Link>
                         <span className="text-xs text-stone-500">
                           {order.created_at
                             ? new Date(order.created_at).toLocaleDateString("es-AR", {

@@ -267,6 +267,14 @@ function ChatContent() {
                           </span>
                         </div>
                       )}
+                      {conversation.order && (
+                        <Link
+                          href={user?.role === "seller" ? `/seller/orders?order=${conversation.order.id}` : "/orders"}
+                          className="mt-1 inline-flex rounded-full bg-olive-muted px-3 py-1 text-xs font-semibold text-olive-dark transition hover:bg-olive-light/40"
+                        >
+                          Pedido {conversation.order.order_number}
+                        </Link>
+                      )}
                     </div>
                   </div>
 

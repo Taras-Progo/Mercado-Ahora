@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
@@ -11,13 +12,14 @@ import {
   getSellerOrders,
   getSellerOrder,
   updateSellerOrderStatus,
+  createSellerOrderConversation,
   money,
   orderStatusLabel,
   orderStatusColor,
   deliveryTypeLabel,
   SELLER_ORDER_STATUSES,
 } from "@/lib/api";
-import { PackageIcon, ChevronDownIcon, MapPinIcon } from "@/components/ui/Icons";
+import { PackageIcon, ChevronDownIcon, MapPinIcon, MessageIcon, CheckCircleIcon } from "@/components/ui/Icons";
 
 export default function SellerOrdersPage() {
   return (
@@ -36,14 +38,20 @@ export default function SellerOrdersPage() {
 }
 
 function SellerOrdersView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedOrderId = searchParams.get("order") ? Number(searchParams.get("order")) : null;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [detail, setDetail] = useState<Order | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
+  const [creatingConversationId, setCreatingConversationId] = useState<number | null>(null);
   const [statusDraft, setStatusDraft] = useState("");
+  const autoOpenedOrderRef = useRef<number | null>(null);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -87,11 +95,28 @@ function SellerOrdersView() {
     [expandedId],
   );
 
+  useEffect(() => {
+    if (!requestedOrderId || loading || autoOpenedOrderRef.current === requestedOrderId) return;
+    const order = orders.find((item) => item.id === requestedOrderId);
+    if (!order) return;
+
+    autoOpenedOrderRef.current = requestedOrderId;
+    const timeout = window.setTimeout(() => {
+      void toggleExpand(order);
+      document.getElementById(`seller-order-${requestedOrderId}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 100);
+    return () => window.clearTimeout(timeout);
+  }, [loading, orders, requestedOrderId, toggleExpand]);
+
   const handleUpdateStatus = useCallback(
     async (orderId: number) => {
       if (!statusDraft) return;
       setSavingStatus(true);
       setError("");
+      setSuccess("");
       try {
         const updated = await updateSellerOrderStatus(orderId, statusDraft);
         setOrders((prev) =>
@@ -102,6 +127,8 @@ function SellerOrdersView() {
             ? { ...prev, status: updated.status, status_history: updated.status_history ?? prev.status_history }
             : prev,
         );
+        setStatusDraft(updated.status);
+        setSuccess(`Estado actualizado a ${orderStatusLabel(updated.status)}.`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "No se pudo actualizar el estado.");
       } finally {
@@ -109,6 +136,23 @@ function SellerOrdersView() {
       }
     },
     [statusDraft],
+  );
+
+  const handleStartConversation = useCallback(
+    async (orderId: number) => {
+      setCreatingConversationId(orderId);
+      setError("");
+      setSuccess("");
+      try {
+        const conversation = await createSellerOrderConversation(orderId);
+        router.push(`/chat?id=${conversation.id}`);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "No se pudo abrir el chat del pedido.");
+      } finally {
+        setCreatingConversationId(null);
+      }
+    },
+    [router],
   );
 
   if (loading) {
@@ -131,6 +175,13 @@ function SellerOrdersView() {
         </div>
       )}
 
+      {success && (
+        <div className="mb-4 flex items-center justify-center gap-2 rounded-full bg-olive-muted px-4 py-2 text-center text-sm font-semibold text-olive-dark">
+          <CheckCircleIcon className="h-4 w-4" />
+          {success}
+        </div>
+      )}
+
       {orders.length === 0 ? (
         <div className="mt-12 rounded-2xl border border-border-soft bg-white p-12 text-center">
           <PackageIcon className="mx-auto h-12 w-12 text-stone-300" />
@@ -147,6 +198,7 @@ function SellerOrdersView() {
             return (
               <div
                 key={order.id}
+                id={`seller-order-${order.id}`}
                 className="overflow-hidden rounded-2xl border border-border-soft bg-white"
               >
                 <button
@@ -253,6 +305,24 @@ function SellerOrdersView() {
                             )}
                           </div>
                         )}
+
+                        <div className="flex flex-col gap-3 rounded-xl border border-border-soft bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">Comunicación con el comprador</p>
+                            <p className="text-xs text-brown-muted">
+                              Usá este chat para coordinar entrega, consultas y detalles del pedido.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleStartConversation(order.id)}
+                            disabled={creatingConversationId === order.id}
+                            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-olive bg-white px-4 py-2 text-sm font-semibold text-olive transition hover:bg-olive-muted disabled:opacity-50"
+                          >
+                            <MessageIcon className="h-4 w-4" />
+                            {creatingConversationId === order.id ? "Abriendo chat..." : "Enviar mensaje al comprador"}
+                          </button>
+                        </div>
 
                         {/* Status update */}
                         <div className="flex flex-col gap-2 border-t border-border-soft pt-4 sm:flex-row sm:items-center sm:justify-between">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Conversation;
 use App\Models\Order;
 use App\Models\PaymentIntent;
 use App\Models\Product;
@@ -154,6 +155,41 @@ class OrderController extends Controller
         ]);
 
         return response()->json(['data' => $order->load('statusHistory')]);
+    }
+
+    public function sellerOrderConversation(Request $request, int $id): JsonResponse
+    {
+        $profile = $request->user()->producerProfile ?? abort(422, 'Perfil de productor requerido.');
+
+        $order = Order::query()
+            ->with(['items.product', 'buyer'])
+            ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
+            ->findOrFail($id);
+
+        $firstItem = $order->items->first();
+
+        $conversation = Conversation::query()->firstOrCreate(
+            ['order_id' => $order->id],
+            [
+                'buyer_id' => $order->buyer_id,
+                'producer_profile_id' => $profile->id,
+                'product_id' => $firstItem?->product_id,
+                'status' => 'open',
+                'last_message_at' => now(),
+            ],
+        );
+
+        if ($conversation->wasRecentlyCreated) {
+            $conversation->messages()->create([
+                'sender_id' => $request->user()->id,
+                'body' => "Hola {$order->buyer?->name}, te escribo por el pedido {$order->order_number} para coordinar los detalles.",
+            ]);
+            $conversation->update(['last_message_at' => now()]);
+        }
+
+        return response()->json([
+            'data' => $conversation->load('buyer', 'producerProfile.user', 'product', 'order', 'messages.sender'),
+        ], $conversation->wasRecentlyCreated ? 201 : 200);
     }
 
     public function returns(Request $request): JsonResponse

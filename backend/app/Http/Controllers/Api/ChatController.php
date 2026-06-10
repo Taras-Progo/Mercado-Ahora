@@ -15,7 +15,7 @@ class ChatController extends Controller
         $user = $request->user();
 
         $conversations = Conversation::query()
-            ->with(['buyer', 'producerProfile.user', 'product', 'messages' => fn ($query) => $query->latest()->limit(1)])
+            ->with(['buyer', 'producerProfile.user', 'product', 'order', 'messages' => fn ($query) => $query->latest()->limit(1)])
             ->where('buyer_id', $user->id)
             ->orWhereHas('producerProfile', fn ($query) => $query->where('user_id', $user->id))
             ->latest('last_message_at')
@@ -55,14 +55,14 @@ class ChatController extends Controller
             $conversation->update(['last_message_at' => now()]);
         }
 
-        return response()->json(['data' => $conversation->load('messages', 'producerProfile')], 201);
+        return response()->json(['data' => $conversation->load('messages', 'producerProfile', 'order')], 201);
     }
 
     public function show(Request $request, int $id): JsonResponse
     {
         $conversation = $this->conversationForUser($request, $id);
 
-        return response()->json(['data' => $conversation->load('buyer', 'producerProfile.user', 'product', 'messages.sender')]);
+        return response()->json(['data' => $conversation->load('buyer', 'producerProfile.user', 'product', 'order', 'messages.sender')]);
     }
 
     public function messages(Request $request, int $id): JsonResponse
