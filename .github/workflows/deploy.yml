@@ -14,10 +14,11 @@ jobs:
         uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ secrets.VPS_HOST }}
+          port: 22
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           password: ${{ secrets.VPS_PASSWORD }}
-          timeout: 60s
+          timeout: 180s
           command_timeout: 30m
           script: |
             set -euo pipefail
