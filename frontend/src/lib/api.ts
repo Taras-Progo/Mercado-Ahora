@@ -382,7 +382,7 @@ async function authFetch(path: string, options: RequestInit = {}): Promise<Respo
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
-  return fetch(apiUrl(path), { ...options, headers });
+  return fetch(apiUrl(path), { cache: "no-store", ...options, headers });
 }
 
 async function apiAuthGet<T>(path: string): Promise<T> {

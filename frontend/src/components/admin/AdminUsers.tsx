@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminUser } from "@/lib/api";
-import { getAdminUsers, resetAdminUserPassword } from "@/lib/api";
+import { getAdminUsers, resetAdminUserPassword, statusLabel } from "@/lib/api";
 import { CheckCircleIcon, SearchIcon, ShieldCheckIcon, UsersIcon, XCircleIcon } from "@/components/ui/Icons";
 
 const roleLabels: Record<AdminUser["role"], string> = {
@@ -188,11 +188,11 @@ export function AdminUsers() {
                     <td className="px-5 py-4 text-stone-600">{roleLabels[user.role] ?? user.role}</td>
                     <td className="px-5 py-4">
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${canReset ? "bg-emerald-100 text-emerald-800" : "bg-stone-100 text-stone-600"}`}>
-                        {user.status}
+                        {statusLabel(user.status)}
                       </span>
                     </td>
                     <td className="px-5 py-4 text-stone-600">
-                      {profile?.business_name ? `${profile.business_name} (${profile.status})` : "-"}
+                      {profile?.business_name ? `${profile.business_name} (${statusLabel(profile.status)})` : "-"}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <button

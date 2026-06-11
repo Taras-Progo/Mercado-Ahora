@@ -56,6 +56,8 @@ class OrderController extends Controller
         }
 
         $items = $cart->items->map(fn ($item) => [
+            'product_id' => $item->product->id,
+            'producer_profile_id' => $item->product->producer_profile_id,
             'product' => $item->product,
             'quantity' => $item->quantity,
             'product_name' => $item->product_name_snapshot ?? $item->product->name,
@@ -252,64 +254,93 @@ class OrderController extends Controller
 
     private function createOrder(Request $request, array $items, array $data): Order
     {
-        return DB::transaction(function () use ($request, $items, $data) {
-            $subtotal = collect($items)->sum(fn ($item) => $item['unit_price_cents'] * $item['quantity']);
-
-            $order = Order::query()->create([
-                'buyer_id' => $request->user()->id,
-                'order_number' => 'MA-'.now()->format('Ymd').'-'.str_pad((string) random_int(1, 999999), 6, '0', STR_PAD_LEFT),
-                'status' => 'pending',
-                'payment_status' => 'not_started',
-                'delivery_type' => $data['delivery_type'] ?? null,
-                'delivery_address' => $data['delivery_address'] ?? null,
-                'city' => $data['city'] ?? null,
-                'province' => $data['province'] ?? null,
-                'subtotal_cents' => $subtotal,
-                'delivery_cents' => 0,
-                'total_cents' => $subtotal,
-                'buyer_note' => $data['buyer_note'] ?? null,
-            ]);
-
-            foreach ($items as $item) {
-                $product = $item['product'];
-                $quantity = $item['quantity'];
-                $unitPrice = $item['unit_price_cents'];
-
-                $order->items()->create([
-                    'product_id' => $product->id,
-                    'producer_profile_id' => $product->producer_profile_id,
-                    'product_name' => $item['product_name'],
-                    'unit_price_cents' => $unitPrice,
-                    'quantity' => $quantity,
-                    'line_total_cents' => $unitPrice * $quantity,
-                ]);
-
-                // Decrement stock
-                if ($product->stock !== null) {
-                    $product->decrement('stock', $quantity);
-                }
-            }
-
-            $order->statusHistory()->create([
-                'changed_by' => $request->user()->id,
-                'status' => 'pending',
-                'note' => 'Pedido creado.',
-            ]);
-
-            return $order->load('items.product.producerProfile', 'statusHistory');
-        });
+        return DB::transaction(fn () => $this->createOrderRecord($request, $items, $data));
     }
 
     private function createGroupedOrders(Request $request, array $items, array $data): array
     {
-        $groups = collect($items)->groupBy(fn ($item) => $item['product']->producer_profile_id);
+        $groups = collect($items)->groupBy(fn ($item) => $item['producer_profile_id'] ?? $item['product']->producer_profile_id);
 
         return DB::transaction(function () use ($request, $groups, $data) {
             return $groups
-                ->map(fn ($producerItems) => $this->createOrder($request, $producerItems->all(), $data))
+                ->map(fn ($producerItems) => $this->createOrderRecord($request, $producerItems->all(), $data))
                 ->values()
                 ->all();
         });
+    }
+
+    private function createOrderRecord(Request $request, array $items, array $data): Order
+    {
+        $items = $this->prepareOrderItems($items);
+        $subtotal = collect($items)->sum(fn ($item) => $item['unit_price_cents'] * $item['quantity']);
+
+        $order = Order::query()->create([
+            'buyer_id' => $request->user()->id,
+            'order_number' => 'MA-'.now()->format('Ymd').'-'.str_pad((string) random_int(1, 999999), 6, '0', STR_PAD_LEFT),
+            'status' => 'pending',
+            'payment_status' => 'not_started',
+            'delivery_type' => $data['delivery_type'] ?? null,
+            'delivery_address' => $data['delivery_address'] ?? null,
+            'city' => $data['city'] ?? null,
+            'province' => $data['province'] ?? null,
+            'subtotal_cents' => $subtotal,
+            'delivery_cents' => 0,
+            'total_cents' => $subtotal,
+            'buyer_note' => $data['buyer_note'] ?? null,
+        ]);
+
+        foreach ($items as $item) {
+            $product = $item['product'];
+            $quantity = $item['quantity'];
+            $unitPrice = $item['unit_price_cents'];
+
+            $order->items()->create([
+                'product_id' => $product->id,
+                'producer_profile_id' => $product->producer_profile_id,
+                'product_name' => $item['product_name'],
+                'unit_price_cents' => $unitPrice,
+                'quantity' => $quantity,
+                'line_total_cents' => $unitPrice * $quantity,
+            ]);
+
+            if ($product->stock !== null) {
+                $product->decrement('stock', $quantity);
+            }
+        }
+
+        $order->statusHistory()->create([
+            'changed_by' => $request->user()->id,
+            'status' => 'pending',
+            'note' => 'Pedido creado.',
+        ]);
+
+        return $order->load('items.product.producerProfile', 'statusHistory');
+    }
+
+    private function prepareOrderItems(array $items): array
+    {
+        return collect($items)
+            ->map(function (array $item) {
+                $productId = $item['product_id'] ?? $item['product']->id ?? null;
+                $product = Product::query()->lockForUpdate()->findOrFail($productId);
+                $quantity = (int) $item['quantity'];
+
+                if ($product->status !== 'active') {
+                    abort(422, "El producto \"{$product->name}\" ya no está disponible.");
+                }
+
+                if ($product->stock !== null && $quantity > $product->stock) {
+                    abort(422, "Stock insuficiente para \"{$product->name}\". Solo quedan {$product->stock} disponibles.");
+                }
+
+                return [
+                    'product' => $product,
+                    'quantity' => $quantity,
+                    'product_name' => $item['product_name'] ?? $product->name,
+                    'unit_price_cents' => $item['unit_price_cents'] ?? $product->price_cents,
+                ];
+            })
+            ->all();
     }
 
     private function orderItemFromProduct(Product $product, int $quantity): array

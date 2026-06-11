@@ -6,7 +6,7 @@ import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import type { Order } from "@/lib/api";
-import { getOrders, money, orderStatusLabel, orderStatusColor } from "@/lib/api";
+import { deliveryTypeLabel, getOrders, money, orderStatusLabel, orderStatusColor } from "@/lib/api";
 import { PackageIcon, ChevronDownIcon } from "@/components/ui/Icons";
 
 export default function OrdersPage() {
@@ -174,7 +174,7 @@ function OrdersContent() {
                             </p>
                             {order.delivery_type && (
                               <p className="text-brown-muted text-xs">
-                                Tipo: {order.delivery_type}
+                                Tipo: {deliveryTypeLabel(order.delivery_type) || "A coordinar"}
                               </p>
                             )}
                             {order.province && (

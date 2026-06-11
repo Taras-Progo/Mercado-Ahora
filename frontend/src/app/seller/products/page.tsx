@@ -259,7 +259,15 @@ function SellerProductsView() {
                     </td>
                     <td className="px-5 py-4 text-stone-600">{product.category?.name ?? "—"}</td>
                     <td className="px-5 py-4 font-semibold text-olive-dark">{money(product.price_cents)}</td>
-                    <td className="px-5 py-4 text-stone-600">{product.stock} {product.unit}</td>
+                    <td className="px-5 py-4">
+                      {product.stock === 0 ? (
+                        <span className="inline-flex rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-700">
+                          Sin stock
+                        </span>
+                      ) : (
+                        <span className="font-medium text-stone-700">{product.stock}</span>
+                      )}
+                    </td>
                     <td className="px-5 py-4">
                       <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold ${statusColor(product.status)}`}>
                         {product.status === "active" && <CheckCircleIcon className="h-3 w-3" />}

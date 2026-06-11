@@ -595,6 +595,117 @@ class ExampleTest extends TestCase
         $this->assertSame($originalStock - 2, $product->refresh()->stock);
     }
 
+    public function test_cart_checkout_allows_last_stock_unit_and_then_rejects_when_empty(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+        $profile = ProducerProfile::query()->where('status', 'active')->firstOrFail();
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Ultima unidad carrito',
+            'slug' => 'ultima-unidad-carrito',
+            'price_cents' => 120000,
+            'currency' => 'ARS',
+            'stock' => 1,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/cart', ['delivery_type' => 'local'])
+            ->assertCreated();
+
+        $this->assertSame(0, $product->refresh()->stock);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertUnprocessable()
+            ->assertJsonFragment(['message' => 'Stock insuficiente. Solo quedan 0 disponibles.']);
+    }
+
+    public function test_buy_now_allows_last_stock_unit_and_then_rejects_when_empty(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+        $profile = ProducerProfile::query()->where('status', 'active')->firstOrFail();
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Ultima unidad compra directa',
+            'slug' => 'ultima-unidad-compra-directa',
+            'price_cents' => 150000,
+            'currency' => 'ARS',
+            'stock' => 1,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', [
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'delivery_type' => 'local',
+            ])
+            ->assertCreated();
+
+        $this->assertSame(0, $product->refresh()->stock);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', [
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'delivery_type' => 'local',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonFragment(['message' => 'Stock insuficiente. Solo quedan 0 disponibles.']);
+    }
+
+    public function test_cart_and_buy_now_reject_quantity_greater_than_available_stock(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+        $profile = ProducerProfile::query()->where('status', 'active')->firstOrFail();
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Stock limitado',
+            'slug' => 'stock-limitado',
+            'price_cents' => 90000,
+            'currency' => 'ARS',
+            'stock' => 1,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 2])
+            ->assertUnprocessable();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', [
+                'product_id' => $product->id,
+                'quantity' => 2,
+                'delivery_type' => 'local',
+            ])
+            ->assertUnprocessable();
+
+        $this->assertSame(1, $product->refresh()->stock);
+    }
+
     public function test_seller_status_update_creates_history_and_buyer_sees_new_status(): void
     {
         $this->seed();
