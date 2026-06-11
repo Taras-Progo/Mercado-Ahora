@@ -18,6 +18,7 @@ import {
   createConversation,
 } from "@/lib/api";
 import { ProductCard } from "@/components/ui/ProductCard";
+import { FavoriteButton } from "@/components/ui/FavoriteButton";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { useAuth } from "@/components/AuthProvider";
@@ -428,6 +429,15 @@ export default function ProductDetailPage() {
                     <CartIcon className="h-4 w-4" />
                     {addingToCart ? "Agregando..." : "Agregar al carrito"}
                   </button>
+                )}
+
+                {!isOwnProduct && (
+                  <FavoriteButton
+                    productId={product.id}
+                    redirectPath={`/products/${product.slug}`}
+                    variant="pill"
+                    showError
+                  />
                 )}
 
                 {/* Cart feedback message */}

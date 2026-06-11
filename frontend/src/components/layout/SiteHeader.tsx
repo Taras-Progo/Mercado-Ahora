@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
 import { BagIcon, ChevronDownIcon, HeartIcon, MessageIcon, SearchIcon } from "@/components/ui/Icons";
 import { useAuth } from "@/components/AuthProvider";
+import { useFavorites } from "@/components/FavoritesProvider";
 import { getCart, getConversations } from "@/lib/api";
 
 type NavItem = { label: string; href: string };
@@ -26,6 +27,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, ready, logout } = useAuth();
+  const { favoriteCount } = useFavorites();
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
@@ -117,7 +119,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             <IconButton transparent={transparent} ariaLabel="Mensajes" href="/chat" badge={user && messageCount > 0 ? messageCount : undefined}>
               <MessageIcon className="h-5 w-5" />
             </IconButton>
-            <IconButton transparent={transparent} ariaLabel="Favoritos" href="/favoritos">
+            <IconButton transparent={transparent} ariaLabel="Favoritos" href="/favoritos" badge={user && favoriteCount > 0 ? favoriteCount : undefined}>
               <HeartIcon className="h-5 w-5" />
             </IconButton>
           </span>
@@ -130,7 +132,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           {/* Desktop auth / account */}
           {ready && user ? (
             <div className="hidden lg:block">
-              <UserMenu name={user.name} role={user.role} transparent={transparent} onLogout={handleLogout} />
+              <UserMenu name={user.name} role={user.role} favoriteCount={favoriteCount} transparent={transparent} onLogout={handleLogout} />
             </div>
           ) : (
             <div className="hidden items-center gap-2 lg:flex">
@@ -234,7 +236,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                     Mensajes
                   </MobileLink>
                   <MobileLink href="/favoritos" onClick={() => setMenuOpen(false)}>
-                    Favoritos
+                    Favoritos{favoriteCount > 0 ? ` (${favoriteCount})` : ""}
                   </MobileLink>
                   <button
                     type="button"
@@ -326,11 +328,13 @@ function IconButton({
 function UserMenu({
   name,
   role,
+  favoriteCount,
   transparent,
   onLogout,
 }: {
   name: string;
   role: string;
+  favoriteCount: number;
   transparent?: boolean;
   onLogout: () => void;
 }) {
@@ -381,7 +385,7 @@ function UserMenu({
             Mis pedidos
           </Link>
           <Link className="px-4 py-2 hover:bg-olive-muted" href="/favoritos">
-            Favoritos
+            Favoritos{favoriteCount > 0 ? ` (${favoriteCount})` : ""}
           </Link>
           <button
             type="button"

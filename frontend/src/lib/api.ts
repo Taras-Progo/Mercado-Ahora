@@ -431,6 +431,32 @@ async function apiAuthDelete<T>(path: string): Promise<T> {
   return json.data ?? json;
 }
 
+// ---- Favorites API ----
+
+export async function getFavorites(): Promise<Product[]> {
+  try {
+    return await apiAuthGet<Product[]>("/favorites");
+  } catch {
+    return [];
+  }
+}
+
+export async function getFavoriteIds(): Promise<number[]> {
+  try {
+    return await apiAuthGet<number[]>("/favorites/ids");
+  } catch {
+    return [];
+  }
+}
+
+export async function addFavorite(productId: number): Promise<{ favorited: boolean; product: Product }> {
+  return apiAuthPost<{ favorited: boolean; product: Product }>(`/favorites/products/${productId}`, {});
+}
+
+export async function removeFavorite(productId: number): Promise<{ favorited: false; product_id: number }> {
+  return apiAuthDelete<{ favorited: false; product_id: number }>(`/favorites/products/${productId}`);
+}
+
 // ---- Seller Product API ----
 
 export async function getSellerProducts(): Promise<Product[]> {

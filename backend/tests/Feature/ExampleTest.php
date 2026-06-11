@@ -10,6 +10,7 @@ use App\Models\OrderItem;
 use App\Models\ProducerProfile;
 use App\Models\User;
 use App\Models\ProductImage;
+use App\Models\ProductFavorite;
 use App\Notifications\FrontendResetPasswordNotification;
 use App\Notifications\FrontendVerifyEmailNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -242,6 +243,193 @@ class ExampleTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.items.0.quantity', 2)
             ->assertJsonPath('data.items.0.unit_price_cents_snapshot', $product->price_cents);
+    }
+
+    public function test_user_can_favorite_and_unfavorite_active_products(): void
+    {
+        $category = Category::query()->create([
+            'name' => 'Alimentos naturales',
+            'slug' => 'alimentos-naturales',
+        ]);
+
+        $seller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+
+        $profile = ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Apiario Favorito',
+            'slug' => 'apiario-favorito',
+            'province' => 'Cordoba',
+            'city' => 'Alta Gracia',
+            'status' => 'active',
+        ]);
+
+        $activeProduct = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Miel favorita',
+            'slug' => 'miel-favorita',
+            'price_cents' => 500000,
+            'currency' => 'ARS',
+            'stock' => 8,
+            'unit' => 'frasco',
+            'status' => 'active',
+        ]);
+
+        ProductImage::query()->create([
+            'product_id' => $activeProduct->id,
+            'path' => 'products/miel-favorita.jpg',
+            'is_primary' => true,
+            'sort_order' => 0,
+        ]);
+
+        $draftProduct = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Miel borrador',
+            'slug' => 'miel-borrador-favoritos',
+            'price_cents' => 400000,
+            'currency' => 'ARS',
+            'stock' => 4,
+            'unit' => 'frasco',
+            'status' => 'draft',
+        ]);
+
+        $buyer = User::factory()->create([
+            'role' => 'buyer',
+            'status' => 'active',
+        ]);
+
+        $this->postJson("/api/v1/favorites/products/{$activeProduct->id}")
+            ->assertUnauthorized();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson("/api/v1/favorites/products/{$draftProduct->id}")
+            ->assertUnprocessable();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson("/api/v1/favorites/products/{$activeProduct->id}")
+            ->assertCreated()
+            ->assertJsonPath('data.favorited', true)
+            ->assertJsonPath('data.product.name', 'Miel favorita')
+            ->assertJsonPath('data.product.province', 'Cordoba')
+            ->assertJsonFragment(['path' => 'products/miel-favorita.jpg']);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson("/api/v1/favorites/products/{$activeProduct->id}")
+            ->assertOk()
+            ->assertJsonPath('data.favorited', true);
+
+        $this->assertSame(1, ProductFavorite::query()->where([
+            'user_id' => $buyer->id,
+            'product_id' => $activeProduct->id,
+        ])->count());
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/favorites/ids')
+            ->assertOk()
+            ->assertJsonPath('data', [$activeProduct->id]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/favorites')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Miel favorita'])
+            ->assertJsonMissing(['name' => 'Miel borrador']);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->deleteJson("/api/v1/favorites/products/{$activeProduct->id}")
+            ->assertOk()
+            ->assertJsonPath('data.favorited', false)
+            ->assertJsonPath('data.product_id', $activeProduct->id);
+
+        $this->assertDatabaseMissing('product_favorites', [
+            'user_id' => $buyer->id,
+            'product_id' => $activeProduct->id,
+        ]);
+    }
+
+    public function test_favorites_are_private_active_only_and_removed_with_product(): void
+    {
+        $category = Category::query()->create([
+            'name' => 'Categoria favoritos',
+            'slug' => 'categoria-favoritos',
+        ]);
+
+        $seller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+
+        $profile = ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Productor Favoritos',
+            'slug' => 'productor-favoritos',
+            'status' => 'active',
+        ]);
+
+        $activeProduct = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Producto privado favorito',
+            'slug' => 'producto-privado-favorito',
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 5,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $pausedProduct = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Producto pausado favorito',
+            'slug' => 'producto-pausado-favorito',
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 5,
+            'unit' => 'unidad',
+            'status' => 'paused',
+        ]);
+
+        $buyer = User::factory()->create([
+            'role' => 'buyer',
+            'status' => 'active',
+        ]);
+
+        $otherBuyer = User::factory()->create([
+            'role' => 'buyer',
+            'status' => 'active',
+        ]);
+
+        ProductFavorite::query()->create([
+            'user_id' => $buyer->id,
+            'product_id' => $activeProduct->id,
+        ]);
+
+        ProductFavorite::query()->create([
+            'user_id' => $buyer->id,
+            'product_id' => $pausedProduct->id,
+        ]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/favorites')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Producto privado favorito'])
+            ->assertJsonMissing(['name' => 'Producto pausado favorito']);
+
+        $this->actingAs($otherBuyer, 'sanctum')
+            ->getJson('/api/v1/favorites/ids')
+            ->assertOk()
+            ->assertJsonPath('data', []);
+
+        $activeProduct->delete();
+
+        $this->assertDatabaseMissing('product_favorites', [
+            'user_id' => $buyer->id,
+            'product_id' => $activeProduct->id,
+        ]);
     }
 
     public function test_login_with_wrong_password_returns_invalid_credentials(): void

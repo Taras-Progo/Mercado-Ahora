@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['producer_profile_id', 'category_id', 'name', 'slug', 'description', 'price_cents', 'currency', 'stock', 'unit', 'province', 'city', 'production_type', 'delivery_type', 'ecoscore_points', 'ecoscore_notes', 'ecoscore_status', 'ecoscore_validated_by', 'ecoscore_validated_at', 'ecoscore_validation_notes', 'status'])]
@@ -33,5 +34,10 @@ class Product extends Model
     public function orderItems(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function favoritedByUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'product_favorites')->withTimestamps();
     }
 }

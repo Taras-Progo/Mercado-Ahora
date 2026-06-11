@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\ProductImageController;
@@ -71,6 +72,11 @@ Route::prefix('v1')->group(function () {
             Route::get('/conversations/{id}/messages', [ChatController::class, 'messages']);
             Route::post('/conversations/{id}/messages', [ChatController::class, 'send']);
             Route::post('/conversations/{id}/stock-question', [ChatController::class, 'stockQuestion']);
+
+            Route::get('/favorites', [FavoriteController::class, 'index']);
+            Route::get('/favorites/ids', [FavoriteController::class, 'ids']);
+            Route::post('/favorites/products/{product}', [FavoriteController::class, 'store']);
+            Route::delete('/favorites/products/{product}', [FavoriteController::class, 'destroy']);
         });
 
         Route::middleware('role:seller')->group(function () {

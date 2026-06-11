@@ -3,7 +3,8 @@
 import Link from "next/link";
 import type { Product } from "@/lib/api";
 import { ecoColor, ecoLabel, imageUrl, money, productionTypeLabel } from "@/lib/api";
-import { HeartIcon, MapPinIcon } from "@/components/ui/Icons";
+import { MapPinIcon } from "@/components/ui/Icons";
+import { FavoriteButton } from "@/components/ui/FavoriteButton";
 
 export function ProductCard({ product }: { product: Product }) {
   const primaryImage = product.images?.find((img) => img.is_primary) ?? product.images?.[0];
@@ -30,11 +31,11 @@ export function ProductCard({ product }: { product: Product }) {
             </svg>
           </div>
         )}
-        <button type="button" aria-label="Agregar a favoritos"
-          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-brown-icon shadow-sm transition hover:bg-white hover:text-olive"
-          onClick={(e) => e.preventDefault()}>
-          <HeartIcon className="h-4 w-4" />
-        </button>
+        <FavoriteButton
+          productId={product.id}
+          redirectPath={`/products/${product.slug}`}
+          className="absolute right-3 top-3"
+        />
         {product.ecoscore_points != null && (
           <span className={`absolute left-3 top-3 rounded-full px-2 py-0.5 text-[10px] font-semibold ${ecoColor(product.ecoscore_points)}`}>
             {ecoLabel(product.ecoscore_points)}
