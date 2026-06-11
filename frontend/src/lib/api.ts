@@ -151,7 +151,23 @@ export type Message = {
   sender?: { id: number; name: string };
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
+const INTERNAL_API_BASE =
+  process.env.INTERNAL_API_BASE_URL ??
+  (PUBLIC_API_BASE.startsWith("http")
+    ? PUBLIC_API_BASE
+    : process.env.NODE_ENV === "production"
+      ? "http://backend:8000/api/v1"
+      : "http://127.0.0.1:8000/api/v1");
+const DEMO_FALLBACK_ENABLED = process.env.NEXT_PUBLIC_ENABLE_DEMO_FALLBACK === "true";
+
+function apiBase(): string {
+  return typeof window === "undefined" ? INTERNAL_API_BASE : PUBLIC_API_BASE;
+}
+
+function apiUrl(path: string): string {
+  return `${apiBase().replace(/\/$/, "")}${path}`;
+}
 
 export const demoCategories: Category[] = [
   { id: 1, name: "Alimentos naturales", slug: "alimentos-naturales", description: "Miel, mermeladas, conservas, frutos secos, granos" },
@@ -286,22 +302,22 @@ export function deliveryTypeLabel(type?: string) {
 
 // ---- Public API (unauthenticated) ----
 
-export async function apiGet<T>(path: string, fallback: T): Promise<T> {
+export async function apiGet<T>(path: string, fallback: T, productionFallback?: T): Promise<T> {
   try {
-    const response = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
-    if (!response.ok) return fallback;
+    const response = await fetch(apiUrl(path), { cache: "no-store" });
+    if (!response.ok) throw new Error(`API request failed: ${response.status}`);
     const json = await response.json();
     return json.data ?? json;
   } catch {
-    return fallback;
+    return DEMO_FALLBACK_ENABLED ? fallback : (productionFallback ?? fallback);
   }
 }
 
 export async function getProducts(params?: Record<string, string>): Promise<Product[]> {
   const qs = params ? "?" + new URLSearchParams(params).toString() : "";
-  const response = await apiGet<{ data?: Product[] } | Product[]>(`/products${qs}`, demoProducts);
+  const response = await apiGet<{ data?: Product[] } | Product[]>(`/products${qs}`, demoProducts, []);
   if (Array.isArray(response)) return response;
-  return response.data ?? demoProducts;
+  return response.data ?? (DEMO_FALLBACK_ENABLED ? demoProducts : []);
 }
 
 export async function getCatalogFilters(params?: Record<string, string>): Promise<CatalogFilters> {
@@ -311,16 +327,24 @@ export async function getCatalogFilters(params?: Record<string, string>): Promis
 }
 
 export async function getProduct(slug: string): Promise<Product | undefined> {
-  return apiGet<Product | undefined>(`/products/${slug}`, demoProducts.find((product) => product.slug === slug));
+  return apiGet<Product | undefined>(
+    `/products/${slug}`,
+    demoProducts.find((product) => product.slug === slug),
+    undefined,
+  );
 }
 
 export async function getCategories(): Promise<Category[]> {
-  const response = await apiGet<Category[]>("/categories", demoCategories);
-  return response ?? demoCategories;
+  const response = await apiGet<Category[]>("/categories", demoCategories, []);
+  return response ?? (DEMO_FALLBACK_ENABLED ? demoCategories : []);
 }
 
 export async function getCategory(slug: string): Promise<Category | undefined> {
-  return apiGet<Category | undefined>(`/categories/${slug}`, demoCategories.find((c) => c.slug === slug));
+  return apiGet<Category | undefined>(
+    `/categories/${slug}`,
+    demoCategories.find((c) => c.slug === slug),
+    undefined,
+  );
 }
 
 export async function getProducers(): Promise<ProducerProfile[]> {
@@ -358,7 +382,7 @@ async function authFetch(path: string, options: RequestInit = {}): Promise<Respo
   if (!(options.body instanceof FormData)) {
     headers["Content-Type"] = "application/json";
   }
-  return fetch(`${API_BASE}${path}`, { ...options, headers });
+  return fetch(apiUrl(path), { ...options, headers });
 }
 
 async function apiAuthGet<T>(path: string): Promise<T> {
@@ -480,8 +504,8 @@ export function imageUrl(path: string): string {
   const configured = process.env.NEXT_PUBLIC_STORAGE_URL;
   const base =
     configured ??
-    (API_BASE.startsWith("http")
-      ? `${new URL(API_BASE).origin}/storage`
+    (PUBLIC_API_BASE.startsWith("http")
+      ? `${new URL(PUBLIC_API_BASE).origin}/storage`
       : "/storage");
   return `${base}/${path}`;
 }

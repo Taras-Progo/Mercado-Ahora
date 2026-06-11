@@ -38,7 +38,7 @@ class CatalogController extends Controller
         $productsQuery = Product::query()
             ->with([
                 'category',
-                'producerProfile',
+                'producerProfile.user',
                 'images' => fn ($query) => $query
                     ->orderByDesc('is_primary')
                     ->orderBy('sort_order')
@@ -49,6 +49,7 @@ class CatalogController extends Controller
         $this->applyPublicProductFilters($productsQuery, $request, $categorySlug);
 
         $products = $productsQuery->paginate(min((int) $request->query('per_page', 12), 50));
+        $products->getCollection()->transform(fn (Product $product) => $this->withEffectiveLocation($product));
 
         return response()->json($products);
     }
@@ -56,11 +57,15 @@ class CatalogController extends Controller
     public function filters(Request $request): JsonResponse
     {
         $categorySlug = $request->query('category');
-        $query = Product::query()->select('province');
+        $query = Product::query()
+            ->with('producerProfile:id,province,city')
+            ->select(['id', 'producer_profile_id', 'province', 'city']);
 
         $this->applyPublicProductFilters($query, $request, $categorySlug, includeProvince: false);
 
-        $provinces = $this->provinceCounts($query->pluck('province'));
+        $provinces = $this->provinceCounts(
+            $query->get()->map(fn (Product $product) => $this->effectiveProvince($product)),
+        );
 
         return response()->json([
             'data' => [
@@ -71,12 +76,14 @@ class CatalogController extends Controller
 
     public function product(string $slug): JsonResponse
     {
+        $product = Product::query()
+            ->with(['category', 'producerProfile.user', 'producerProfile.socialLinks', 'images'])
+            ->where('slug', $slug)
+            ->where('status', 'active')
+            ->firstOrFail();
+
         return response()->json([
-            'data' => Product::query()
-                ->with(['category', 'producerProfile.user', 'producerProfile.socialLinks', 'images'])
-                ->where('slug', $slug)
-                ->where('status', 'active')
-                ->firstOrFail(),
+            'data' => $this->withEffectiveLocation($product),
         ]);
     }
 
@@ -84,21 +91,24 @@ class CatalogController extends Controller
     {
         $product = Product::query()->where('slug', $slug)->firstOrFail();
 
+        $related = Product::query()
+            ->with([
+                'category',
+                'producerProfile.user',
+                'images' => fn ($query) => $query
+                    ->orderByDesc('is_primary')
+                    ->orderBy('sort_order')
+                    ->orderBy('id'),
+            ])
+            ->where('status', 'active')
+            ->where('id', '!=', $product->id)
+            ->where('category_id', $product->category_id)
+            ->limit(4)
+            ->get()
+            ->map(fn (Product $product) => $this->withEffectiveLocation($product));
+
         return response()->json([
-            'data' => Product::query()
-                ->with([
-                    'category',
-                    'producerProfile',
-                    'images' => fn ($query) => $query
-                        ->orderByDesc('is_primary')
-                        ->orderBy('sort_order')
-                        ->orderBy('id'),
-                ])
-                ->where('status', 'active')
-                ->where('id', '!=', $product->id)
-                ->where('category_id', $product->category_id)
-                ->limit(4)
-                ->get(),
+            'data' => $related,
         ]);
     }
 
@@ -153,21 +163,73 @@ class CatalogController extends Controller
                     $inner
                         ->whereRaw('LOWER(name) LIKE ?', [$searchLike])
                         ->orWhereRaw('LOWER(description) LIKE ?', [$searchLike])
+                        ->orWhereRaw('LOWER(city) LIKE ?', [$searchLike])
+                        ->orWhereRaw('LOWER(province) LIKE ?', [$searchLike])
                         ->orWhereHas('category', fn ($category) => $category->whereRaw('LOWER(name) LIKE ?', [$searchLike]))
-                        ->orWhereHas('producerProfile', fn ($profile) => $profile->whereRaw('LOWER(business_name) LIKE ?', [$searchLike]));
+                        ->orWhereHas('producerProfile', function ($profile) use ($searchLike) {
+                            $profile
+                                ->whereRaw('LOWER(business_name) LIKE ?', [$searchLike])
+                                ->orWhereRaw('LOWER(city) LIKE ?', [$searchLike])
+                                ->orWhereRaw('LOWER(province) LIKE ?', [$searchLike])
+                                ->orWhereHas('user', fn ($user) => $user->whereRaw('LOWER(name) LIKE ?', [$searchLike]));
+                        });
                 });
             })
             ->when($categorySlug, function ($query, $slug) {
                 $query->whereHas('category', fn ($category) => $category->where('slug', $slug));
             })
-            ->when($includeProvince && $request->query('province'), function ($query, $province) {
-                $normalizedProvince = $this->normalizeProvince((string) $province);
+            ->when($includeProvince && $request->query('province'), function ($query) use ($request) {
+                $normalizedProvince = $this->normalizeProvince((string) $request->query('province'));
 
                 if ($normalizedProvince !== '') {
-                    $query->whereRaw('TRIM(province) = ?', [$normalizedProvince]);
+                    $normalizedProvince = strtolower($normalizedProvince);
+
+                    $query->where(function ($inner) use ($normalizedProvince) {
+                        $inner
+                            ->whereRaw("LOWER(TRIM(COALESCE(province, ''))) = ?", [$normalizedProvince])
+                            ->orWhere(function ($fallback) use ($normalizedProvince) {
+                                $fallback
+                                    ->where(function ($blankProductProvince) {
+                                        $blankProductProvince
+                                            ->whereNull('province')
+                                            ->orWhereRaw("TRIM(province) = ''");
+                                    })
+                                    ->whereHas('producerProfile', fn ($profile) => $profile
+                                        ->whereRaw("LOWER(TRIM(COALESCE(province, ''))) = ?", [$normalizedProvince]));
+                            });
+                    });
                 }
             })
             ->when($request->query('production_type'), fn ($query, $type) => $query->where('production_type', $type));
+    }
+
+    private function withEffectiveLocation(Product $product): Product
+    {
+        $product->setAttribute('city', $this->effectiveCity($product));
+        $product->setAttribute('province', $this->effectiveProvince($product));
+
+        return $product;
+    }
+
+    private function effectiveCity(Product $product): ?string
+    {
+        $city = $this->normalizeProvince((string) $product->city);
+
+        return $city !== '' ? $city : $this->nullableNormalized($product->producerProfile?->city);
+    }
+
+    private function effectiveProvince(Product $product): ?string
+    {
+        $province = $this->normalizeProvince((string) $product->province);
+
+        return $province !== '' ? $province : $this->nullableNormalized($product->producerProfile?->province);
+    }
+
+    private function nullableNormalized(?string $value): ?string
+    {
+        $normalized = $this->normalizeProvince((string) $value);
+
+        return $normalized !== '' ? $normalized : null;
     }
 
     private function provinceCounts(Collection $rawProvinces): array

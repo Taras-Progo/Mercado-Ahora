@@ -165,6 +165,7 @@ class SellerController extends Controller
     {
         $profile = $this->profileOrFail($request);
         $data = $this->validateProduct($request);
+        $data = $this->applyProductLocationDefaults($data, $profile);
         $this->ensureCanUseProductStatus($profile, $data['status'] ?? 'draft');
 
         $product = $profile->products()->create([
@@ -191,6 +192,7 @@ class SellerController extends Controller
         $profile = $this->profileOrFail($request);
         $product = $profile->products()->findOrFail($id);
         $data = $this->validateProduct($request, true);
+        $data = $this->applyProductLocationDefaults($data, $profile, partial: true);
         $this->ensureCanUseProductStatus($profile, $data['status'] ?? $product->status);
 
         $product->update($data);
@@ -284,6 +286,19 @@ class SellerController extends Controller
         if ($status === 'active' && $profile->status !== 'active') {
             abort(403, 'El productor debe estar aprobado antes de publicar productos activos.');
         }
+    }
+
+    private function applyProductLocationDefaults(array $data, ProducerProfile $profile, bool $partial = false): array
+    {
+        if ((! $partial || array_key_exists('province', $data)) && blank($data['province'] ?? null)) {
+            $data['province'] = $profile->province;
+        }
+
+        if ((! $partial || array_key_exists('city', $data)) && blank($data['city'] ?? null)) {
+            $data['city'] = $profile->city;
+        }
+
+        return $data;
     }
 
     private function profileCompletionPercent(?ProducerProfile $profile): int

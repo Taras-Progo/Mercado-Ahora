@@ -55,6 +55,7 @@ class ExampleTest extends TestCase
         ]);
 
         $seller = User::factory()->create([
+            'name' => 'Gabriel Londero',
             'role' => 'seller',
             'status' => 'active',
         ]);
@@ -63,6 +64,8 @@ class ExampleTest extends TestCase
             'user_id' => $seller->id,
             'business_name' => 'Apiario del Valle',
             'slug' => 'apiario-del-valle',
+            'province' => 'Córdoba',
+            'city' => 'Córdoba',
             'status' => 'active',
         ]);
 
@@ -76,6 +79,8 @@ class ExampleTest extends TestCase
             'currency' => 'ARS',
             'stock' => 7,
             'unit' => 'frasco',
+            'city' => 'Villa del Prado',
+            'province' => null,
             'status' => 'active',
         ]);
 
@@ -100,12 +105,31 @@ class ExampleTest extends TestCase
             ]);
         }
 
+        $this->assertDatabaseHas('products', [
+            'name' => 'Miel Artesanal',
+            'status' => 'active',
+        ]);
+
+        $this->getJson('/api/v1/products')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Miel Artesanal']);
+
         $this->getJson('/api/v1/products?q=miel')
             ->assertOk()
             ->assertJsonFragment(['name' => 'Miel Artesanal'])
+            ->assertJsonFragment(['province' => 'Córdoba'])
+            ->assertJsonFragment(['city' => 'Villa del Prado'])
             ->assertJsonFragment(['path' => 'products/miel-artesanal.jpg'])
             ->assertJsonMissing(['name' => 'Miel draft'])
             ->assertJsonMissing(['name' => 'Miel paused']);
+
+        $this->getJson('/api/v1/products?q=gabriel')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Miel Artesanal']);
+
+        $this->getJson('/api/v1/products?province=C%C3%B3rdoba')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Miel Artesanal']);
     }
 
     public function test_catalog_filters_return_only_active_product_provinces_with_counts(): void
@@ -128,6 +152,8 @@ class ExampleTest extends TestCase
             'user_id' => $seller->id,
             'business_name' => 'Apiario Cordoba',
             'slug' => 'apiario-cordoba',
+            'province' => 'Córdoba',
+            'city' => 'Córdoba',
             'status' => 'active',
         ]);
 
@@ -179,14 +205,14 @@ class ExampleTest extends TestCase
             ->assertOk();
 
         $this->assertSame([
-            ['value' => 'Córdoba', 'label' => 'Córdoba', 'count' => 2],
+            ['value' => 'Córdoba', 'label' => 'Córdoba', 'count' => 3],
             ['value' => 'Mendoza', 'label' => 'Mendoza', 'count' => 1],
         ], $response->json('data.provinces'));
 
         $this->getJson('/api/v1/catalog/filters?q=miel')
             ->assertOk()
             ->assertJsonPath('data.provinces', [
-                ['value' => 'Córdoba', 'label' => 'Córdoba', 'count' => 2],
+                ['value' => 'Córdoba', 'label' => 'Córdoba', 'count' => 3],
             ]);
 
         $this->getJson('/api/v1/catalog/filters?category=artesanias')

@@ -6,6 +6,7 @@ import {
   createProduct,
   deliveryTypeLabel,
   getCategories,
+  getSellerProfile,
   money,
   productionTypeLabel,
   updateProduct,
@@ -47,14 +48,23 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
   const [unit, setUnit] = useState(product?.unit ?? "unidad");
   const [productionType, setProductionType] = useState(product?.production_type ?? "organico");
   const [deliveryType, setDeliveryType] = useState(product?.delivery_type ?? "");
-  const [origin, setOrigin] = useState(
-    product?.city ? [product.city, product.province].filter(Boolean).join(", ") : "",
-  );
+  const [city, setCity] = useState(product?.city ?? "");
+  const [province, setProvince] = useState(product?.province ?? "");
   const [images, setImages] = useState<ProductImage[]>(product?.images ?? []);
 
   useEffect(() => {
     getCategories().then(setCategories);
   }, []);
+
+  useEffect(() => {
+    if (product) return;
+
+    getSellerProfile().then((profile) => {
+      if (!profile) return;
+      setCity((current) => current || profile.city || "");
+      setProvince((current) => current || profile.province || "");
+    });
+  }, [product]);
 
   const parsedPrice = Number.parseFloat(pricePesos);
   const parsedStock = Number.parseInt(stock, 10);
@@ -70,9 +80,6 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
     unit.trim().length > 0;
 
   const productPayload = useMemo(() => {
-    const [city, ...rest] = origin.split(",").map((s) => s.trim());
-    const province = rest.join(", ") || null;
-
     return {
       name: name.trim(),
       description: description.trim() || null,
@@ -82,10 +89,10 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
       unit: unit || "unidad",
       production_type: productionType || null,
       delivery_type: deliveryType || null,
-      city: city || null,
-      province,
+      city: city.trim() || null,
+      province: province.trim() || null,
     };
-  }, [name, description, categoryId, pricePesos, stock, unit, productionType, deliveryType, origin]);
+  }, [name, description, categoryId, pricePesos, stock, unit, productionType, deliveryType, city, province]);
 
   const persistedStatus = savedProduct?.status ?? product?.status ?? "draft";
   const isPublished = persistedStatus === "active";
@@ -321,12 +328,21 @@ export function ProductForm({ product, onSaved, onCancel }: Props) {
       {/* 4. Detalles adicionales */}
       <SectionCard number={4} title="Detalles adicionales">
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field label="Origen / Lugar de producción">
+          <Field label="Localidad / Ciudad">
             <input
               type="text"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              placeholder="Ej: Villa General Belgrano, Córdoba"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="Ej: Villa del Prado"
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Provincia">
+            <input
+              type="text"
+              value={province}
+              onChange={(e) => setProvince(e.target.value)}
+              placeholder="Ej: Córdoba"
               className={inputClass}
             />
           </Field>

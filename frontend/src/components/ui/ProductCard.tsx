@@ -8,7 +8,11 @@ import { HeartIcon, MapPinIcon } from "@/components/ui/Icons";
 export function ProductCard({ product }: { product: Product }) {
   const primaryImage = product.images?.find((img) => img.is_primary) ?? product.images?.[0];
   const imageSrc = primaryImage ? imageUrl(primaryImage.path) : undefined;
-  const location = product.city ?? product.province ?? product.producerProfile?.city ?? product.producer_profile?.city ?? "";
+  const producer = product.producerProfile ?? product.producer_profile;
+  const city = product.city || producer?.city;
+  const province = product.province || producer?.province;
+  const location = [city, province].filter(Boolean).join(", ");
+  const producerName = producer?.business_name;
 
   return (
     <Link
@@ -39,6 +43,9 @@ export function ProductCard({ product }: { product: Product }) {
       </div>
       <div className="grid gap-1.5 p-4">
         <h3 className="line-clamp-1 text-sm font-semibold text-foreground">{product.name}</h3>
+        {producerName && (
+          <p className="line-clamp-1 text-xs font-medium text-brown-muted">{producerName}</p>
+        )}
         {product.production_type && (
           <p className="text-[11px] font-medium text-brown-muted">{productionTypeLabel(product.production_type)}</p>
         )}
