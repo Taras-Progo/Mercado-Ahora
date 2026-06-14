@@ -33,7 +33,7 @@ export function EmailVerificationBanner({ email, verified }: Props) {
         body: JSON.stringify({ email }),
       });
       if (response.ok) {
-        setFeedback("Te enviamos un email de verificacion. Revisa tu bandeja de entrada.");
+        setFeedback("Te enviamos un email de verificación. Revisá tu bandeja de entrada.");
       } else {
         setFeedback("No se pudo procesar la solicitud.");
       }
@@ -70,7 +70,7 @@ export function EmailVerificationBanner({ email, verified }: Props) {
           disabled={loading}
           className="rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-amber-700 disabled:opacity-60"
         >
-          {loading ? "Procesando..." : "Reenviar verificacion"}
+          {loading ? "Procesando..." : "Reenviar verificación"}
         </button>
         <Link
           href="/verificar-email"

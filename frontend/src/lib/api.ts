@@ -108,6 +108,7 @@ export type Order = {
     note?: string;
     created_at: string;
   }>;
+  return_requests?: ReturnRequest[];
 };
 
 export type CartItem = {
@@ -263,6 +264,7 @@ export function statusLabel(status?: string) {
     case "paused": return "Pausado";
     case "rejected": return "Rechazado";
     case "pending": return "Pendiente";
+    case "suspended": return "Suspendido";
     default: return status ?? "";
   }
 }
@@ -763,6 +765,8 @@ export type ReturnRequest = {
   details?: string;
   status: string;
   created_at?: string;
+  order?: Order;
+  buyer?: { id: number; name: string; email?: string };
 };
 
 export type AdminUser = {
@@ -797,6 +801,10 @@ export async function resetAdminUserPassword(
   });
 }
 
+export async function updateAdminUserStatus(id: number, status: string): Promise<AdminUser> {
+  return apiAuthPatch<AdminUser>(`/admin/users/${id}/status`, { status });
+}
+
 export async function getAdminProducts(): Promise<Product[]> {
   try {
     return await apiAuthGet<Product[]>("/admin/products");
@@ -825,6 +833,10 @@ export async function getAdminOrders(): Promise<Order[]> {
   }
 }
 
+export async function getAdminOrder(id: number): Promise<Order> {
+  return apiAuthGet<Order>(`/admin/orders/${id}`);
+}
+
 export async function updateAdminOrderStatus(id: number, status: string, note?: string): Promise<Order> {
   return apiAuthPatch<Order>(`/admin/orders/${id}/status`, { status, note });
 }
@@ -841,6 +853,26 @@ export async function updateAdminReturnStatus(id: number, status: string): Promi
   return apiAuthPatch<ReturnRequest>(`/admin/returns/${id}/status`, { status });
 }
 
+export async function requestReturn(orderId: number, payload: { reason: string; details?: string }): Promise<ReturnRequest> {
+  return apiAuthPost<ReturnRequest>(`/orders/${orderId}/returns`, payload);
+}
+
+export async function getReturns(): Promise<ReturnRequest[]> {
+  try {
+    return await apiAuthGet<ReturnRequest[]>("/returns");
+  } catch {
+    return [];
+  }
+}
+
+export async function getSellerReturns(): Promise<ReturnRequest[]> {
+  try {
+    return await apiAuthGet<ReturnRequest[]>("/seller/returns");
+  } catch {
+    return [];
+  }
+}
+
 export function orderStatusLabel(status?: string): string {
   const labels: Record<string, string> = {
     pending: "Pendiente",
@@ -852,6 +884,38 @@ export function orderStatusLabel(status?: string): string {
     returned: "Devuelto",
   };
   return status ? (labels[status] ?? status) : "";
+}
+
+export const ADMIN_ORDER_STATUSES = [
+  "pending",
+  "confirmed",
+  "processing",
+  "shipped",
+  "delivered",
+  "cancelled",
+  "returned",
+] as const;
+
+export const RETURN_STATUSES = ["open", "approved", "rejected", "completed"] as const;
+
+export function returnStatusLabel(status?: string): string {
+  const labels: Record<string, string> = {
+    open: "Solicitada",
+    approved: "Aprobada",
+    rejected: "Rechazada",
+    completed: "Completada",
+  };
+  return status ? (labels[status] ?? status) : "";
+}
+
+export function returnStatusColor(status?: string): string {
+  switch (status) {
+    case "open": return "bg-sky-100 text-sky-800";
+    case "approved": return "bg-emerald-100 text-emerald-800";
+    case "rejected": return "bg-red-100 text-red-700";
+    case "completed": return "bg-stone-200 text-stone-700";
+    default: return "bg-stone-100 text-stone-600";
+  }
 }
 
 export function orderStatusColor(status?: string): string {

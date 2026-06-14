@@ -16,10 +16,8 @@ import {
 } from "@/lib/api";
 import {
   BagIcon,
-  BellIcon,
   ChevronRightIcon,
   ClockIcon,
-  HeartIcon,
   LeafIcon,
   MessageIcon,
   PackageIcon,
@@ -260,12 +258,9 @@ function Sidebar({ pendingOrders, profileCompletion }: { pendingOrders: number; 
     { label: "Pedidos", icon: PackageIcon, href: "/seller/orders", badge: pendingOrders || undefined },
     { label: "Productos", icon: BagIcon, href: "/seller/products" },
     { label: "Mensajes", icon: MessageIcon, href: "/chat" },
-    { label: "Novedades", icon: BellIcon, href: "/seller/posts" },
-    { label: "Seguidores", icon: UsersIcon, href: "/seller/followers" },
-    { label: "Estadísticas", icon: TrendingUpIcon, href: "/seller/stats" },
+    { label: "Devoluciones", icon: PackageIcon, href: "/seller/returns" },
     { label: "EcoScore", icon: LeafIcon, href: "/seller/ecoscore", isNew: true },
     { label: "Configuración", icon: SearchIcon, href: "/seller/profile" },
-    { label: "Pagos y cobros", icon: HeartIcon, href: "/seller/pagos" },
     { label: "Ayuda", icon: MessageIcon, href: "/ayuda" },
   ];
 
@@ -568,7 +563,7 @@ function NewsComposer() {
 
 function FollowersCard() {
   return (
-    <DashboardCard title="Seguidores" action={{ label: "Ver lista", href: "/seller/followers" }}>
+    <DashboardCard title="Seguidores">
       <p className="font-serif text-3xl font-bold text-stone-900">0</p>
       <p className="text-xs text-stone-500">Todavia no hay seguidores registrados.</p>
       <div className="mt-4 rounded-xl border border-dashed border-border-soft bg-cream-card p-4 text-xs text-stone-500">
@@ -644,12 +639,11 @@ function NearbyBuyersBanner() {
           <p className="text-xs text-olive-dark/80">Proximamente se mostraran interesados reales segun ubicacion y categorias.</p>
         </div>
       </div>
-      <Link
-        href="/seller/followers"
-        className="inline-flex shrink-0 items-center justify-center rounded-full bg-olive-dark px-4 py-2 text-xs font-semibold text-white transition hover:bg-olive"
+      <span
+        className="inline-flex shrink-0 items-center justify-center rounded-full bg-olive-dark px-4 py-2 text-xs font-semibold text-white"
       >
         Proximamente
-      </Link>
+      </span>
     </div>
   );
 }

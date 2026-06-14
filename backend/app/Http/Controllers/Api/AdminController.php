@@ -27,7 +27,7 @@ class AdminController extends Controller
 
     public function updateUserStatus(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['status' => ['required', 'string', 'max:30']]);
+        $data = $request->validate(['status' => ['required', 'string', Rule::in(['active', 'pending', 'suspended'])]]);
         $user = User::query()->findOrFail($id);
         $user->update($data);
 
@@ -43,7 +43,7 @@ class AdminController extends Controller
         $user = User::query()->findOrFail($id);
 
         if ($user->status !== 'active') {
-            abort(422, 'Solo se puede restablecer la contrasena de usuarios activos.');
+            abort(422, 'Solo se puede restablecer la contraseña de usuarios activos.');
         }
 
         $user->forceFill([
@@ -55,7 +55,7 @@ class AdminController extends Controller
         return response()->json([
             'data' => [
                 'user' => $user->fresh(),
-                'message' => 'Contrasena restablecida. El usuario debera ingresar con la nueva contrasena temporal.',
+                'message' => 'Contraseña restablecida. El usuario deberá ingresar con la nueva contraseña temporal.',
             ],
         ]);
     }
@@ -155,18 +155,27 @@ class AdminController extends Controller
 
     public function orders(): JsonResponse
     {
-        return response()->json(['data' => Order::query()->with('buyer', 'items')->latest()->get()]);
+        return response()->json([
+            'data' => Order::query()
+                ->with('buyer', 'items.product', 'statusHistory', 'returnRequests')
+                ->latest()
+                ->get(),
+        ]);
     }
 
     public function order(int $id): JsonResponse
     {
-        return response()->json(['data' => Order::query()->with('buyer', 'items.product', 'statusHistory')->findOrFail($id)]);
+        return response()->json([
+            'data' => Order::query()
+                ->with('buyer', 'items.product', 'statusHistory', 'returnRequests')
+                ->findOrFail($id),
+        ]);
     }
 
     public function updateOrderStatus(Request $request, int $id): JsonResponse
     {
         $data = $request->validate([
-            'status' => ['required', 'string', Rule::in(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'])],
+            'status' => ['required', 'string', Rule::in(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', 'returned'])],
             'note' => ['nullable', 'string'],
         ]);
         $order = Order::query()->findOrFail($id);
@@ -177,20 +186,36 @@ class AdminController extends Controller
             'note' => $data['note'] ?? null,
         ]);
 
-        return response()->json(['data' => $order->load('statusHistory')]);
+        return response()->json(['data' => $order->load('buyer', 'items.product', 'statusHistory', 'returnRequests')]);
     }
 
     public function returns(): JsonResponse
     {
-        return response()->json(['data' => ReturnRequest::query()->latest()->get()]);
+        return response()->json([
+            'data' => ReturnRequest::query()
+                ->with('buyer', 'order.items.product', 'order.statusHistory')
+                ->latest()
+                ->get(),
+        ]);
     }
 
     public function updateReturnStatus(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['status' => ['required', 'string', 'max:30']]);
-        $return = ReturnRequest::query()->findOrFail($id);
+        $data = $request->validate(['status' => ['required', 'string', Rule::in(['open', 'approved', 'rejected', 'completed'])]]);
+        $return = ReturnRequest::query()->with('order')->findOrFail($id);
         $return->update($data);
 
-        return response()->json(['data' => $return]);
+        if ($data['status'] === 'completed' && $return->order && $return->order->status !== 'returned') {
+            $return->order->update(['status' => 'returned']);
+            $return->order->statusHistory()->create([
+                'changed_by' => $request->user()->id,
+                'status' => 'returned',
+                'note' => 'Devolución completada por administración.',
+            ]);
+        }
+
+        return response()->json([
+            'data' => $return->load('buyer', 'order.items.product', 'order.statusHistory'),
+        ]);
     }
 }

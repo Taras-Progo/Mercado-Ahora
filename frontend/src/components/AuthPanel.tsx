@@ -268,7 +268,7 @@ export function AuthPreparedFlows() {
     <section className="mt-8 grid gap-2 rounded-2xl border border-border-soft bg-cream-card p-5">
       <h3 className="text-sm font-semibold text-stone-800">Acceso seguro</h3>
       <p className="text-xs leading-relaxed text-stone-600">
-        La verificacion de email y la recuperacion de contrasena ya envian correos reales mediante Resend.
+        La verificación de email y la recuperación de contraseña ya envían correos reales mediante Resend.
       </p>
       <div className="mt-1 flex flex-wrap gap-2 text-xs">
         <Link

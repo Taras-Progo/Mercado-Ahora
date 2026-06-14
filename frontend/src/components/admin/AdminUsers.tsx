@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminUser } from "@/lib/api";
-import { getAdminUsers, resetAdminUserPassword, statusLabel } from "@/lib/api";
+import { getAdminUsers, resetAdminUserPassword, statusLabel, updateAdminUserStatus } from "@/lib/api";
 import { CheckCircleIcon, SearchIcon, ShieldCheckIcon, UsersIcon, XCircleIcon } from "@/components/ui/Icons";
 
 const roleLabels: Record<AdminUser["role"], string> = {
@@ -16,6 +16,8 @@ export function AdminUsers() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<AdminUser | null>(null);
+  const [statusDrafts, setStatusDrafts] = useState<Record<number, string>>({});
+  const [statusBusyId, setStatusBusyId] = useState<number | null>(null);
   const [password, setPassword] = useState("");
   const [passwordConfirmation, setPasswordConfirmation] = useState("");
   const [busy, setBusy] = useState(false);
@@ -25,6 +27,7 @@ export function AdminUsers() {
     setLoading(true);
     const data = await getAdminUsers();
     setUsers(data);
+    setStatusDrafts(Object.fromEntries(data.map((user) => [user.id, user.status])));
     setLoading(false);
   }, []);
 
@@ -77,6 +80,25 @@ export function AdminUsers() {
       });
     } finally {
       setBusy(false);
+    }
+  };
+
+  const submitStatus = async (user: AdminUser) => {
+    const status = statusDrafts[user.id];
+    if (!status || status === user.status) return;
+    setStatusBusyId(user.id);
+    setFeedback(null);
+    try {
+      const updated = await updateAdminUserStatus(user.id, status);
+      setUsers((prev) => prev.map((item) => (item.id === user.id ? { ...item, ...updated } : item)));
+      setFeedback({ tone: "success", text: `Estado de ${updated.name} actualizado a ${statusLabel(updated.status)}.` });
+    } catch (err) {
+      setFeedback({
+        tone: "error",
+        text: err instanceof Error ? err.message : "No se pudo actualizar el estado del usuario.",
+      });
+    } finally {
+      setStatusBusyId(null);
     }
   };
 
@@ -187,9 +209,27 @@ export function AdminUsers() {
                     </td>
                     <td className="px-5 py-4 text-stone-600">{roleLabels[user.role] ?? user.role}</td>
                     <td className="px-5 py-4">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${canReset ? "bg-emerald-100 text-emerald-800" : "bg-stone-100 text-stone-600"}`}>
-                        {statusLabel(user.status)}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <select
+                          value={statusDrafts[user.id] ?? user.status}
+                          onChange={(event) =>
+                            setStatusDrafts((prev) => ({ ...prev, [user.id]: event.target.value }))
+                          }
+                          className="rounded-full border border-border-soft px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-olive/30"
+                        >
+                          <option value="active">Activo</option>
+                          <option value="pending">Pendiente</option>
+                          <option value="suspended">Suspendido</option>
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => submitStatus(user)}
+                          disabled={statusBusyId === user.id || (statusDrafts[user.id] ?? user.status) === user.status}
+                          className="rounded-full border border-border-soft px-3 py-1.5 text-xs font-semibold text-olive-dark transition hover:border-olive hover:bg-olive-muted disabled:opacity-40"
+                        >
+                          {statusBusyId === user.id ? "..." : "Guardar"}
+                        </button>
+                      </div>
                     </td>
                     <td className="px-5 py-4 text-stone-600">
                       {profile?.business_name ? `${profile.business_name} (${statusLabel(profile.status)})` : "-"}

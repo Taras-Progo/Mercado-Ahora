@@ -191,7 +191,7 @@ class AuthController extends Controller
         $user->sendEmailVerificationNotification();
 
         return response()->json([
-            'data' => ['message' => 'Te enviamos un email de verificacion.'],
+            'data' => ['message' => 'Te enviamos un email de verificación.'],
         ]);
     }
 
@@ -200,7 +200,7 @@ class AuthController extends Controller
         $user = User::query()->findOrFail($id);
 
         if (! hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
-            abort(403, 'El enlace de verificacion no es valido.');
+            abort(403, 'El enlace de verificación no es válido.');
         }
 
         if (! $user->hasVerifiedEmail()) {

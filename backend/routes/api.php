@@ -97,7 +97,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/seller/orders/{id}', [OrderController::class, 'sellerOrder']);
             Route::patch('/seller/orders/{id}/status', [OrderController::class, 'updateSellerStatus']);
             Route::post('/seller/orders/{id}/conversation', [OrderController::class, 'sellerOrderConversation']);
-            Route::get('/seller/returns', [OrderController::class, 'returns']);
+            Route::get('/seller/returns', [OrderController::class, 'sellerReturns']);
             Route::post('/seller/products/{product}/images', [ProductImageController::class, 'store']);
             Route::patch('/seller/products/{product}/images/{image}', [ProductImageController::class, 'update']);
             Route::delete('/seller/products/{product}/images/{image}', [ProductImageController::class, 'destroy']);

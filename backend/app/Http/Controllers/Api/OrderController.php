@@ -90,13 +90,18 @@ class OrderController extends Controller
     public function buyerOrders(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => $request->user()->orders()->with('items.product.producerProfile')->latest()->get(),
+            'data' => $request->user()->orders()
+                ->with('items.product.producerProfile', 'statusHistory', 'returnRequests')
+                ->latest()
+                ->get(),
         ]);
     }
 
     public function show(Request $request, int $id): JsonResponse
     {
-        $order = Order::query()->with('items.product.producerProfile', 'statusHistory')->findOrFail($id);
+        $order = Order::query()
+            ->with('items.product.producerProfile', 'statusHistory', 'returnRequests')
+            ->findOrFail($id);
 
         if (! $request->user()->isAdmin() && $order->buyer_id !== $request->user()->id) {
             abort(403);
@@ -118,7 +123,7 @@ class OrderController extends Controller
 
         return response()->json([
             'data' => Order::query()
-                ->with('buyer', 'items.product')
+                ->with('buyer', 'items.product', 'returnRequests')
                 ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
                 ->latest()
                 ->get(),
@@ -131,7 +136,7 @@ class OrderController extends Controller
 
         return response()->json([
             'data' => Order::query()
-                ->with('items.product', 'buyer', 'statusHistory')
+                ->with('items.product', 'buyer', 'statusHistory', 'returnRequests')
                 ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
                 ->findOrFail($id),
         ]);
@@ -156,7 +161,7 @@ class OrderController extends Controller
             'note' => $data['note'] ?? null,
         ]);
 
-        return response()->json(['data' => $order->load('statusHistory')]);
+        return response()->json(['data' => $order->load('statusHistory', 'returnRequests')]);
     }
 
     public function sellerOrderConversation(Request $request, int $id): JsonResponse
@@ -197,17 +202,42 @@ class OrderController extends Controller
     public function returns(Request $request): JsonResponse
     {
         return response()->json([
-            'data' => ReturnRequest::query()->where('buyer_id', $request->user()->id)->latest()->get(),
+            'data' => ReturnRequest::query()
+                ->with('order.items.product', 'buyer')
+                ->where('buyer_id', $request->user()->id)
+                ->latest()
+                ->get(),
+        ]);
+    }
+
+    public function sellerReturns(Request $request): JsonResponse
+    {
+        $profile = $request->user()->producerProfile ?? abort(422, 'Perfil de productor requerido.');
+
+        return response()->json([
+            'data' => ReturnRequest::query()
+                ->with('buyer', 'order.items.product', 'order.statusHistory')
+                ->whereHas('order.items', fn ($query) => $query->where('producer_profile_id', $profile->id))
+                ->latest()
+                ->get(),
         ]);
     }
 
     public function requestReturn(Request $request, int $orderId): JsonResponse
     {
-        $order = $request->user()->orders()->findOrFail($orderId);
+        $order = $request->user()->orders()->with('returnRequests')->findOrFail($orderId);
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:255'],
             'details' => ['nullable', 'string'],
         ]);
+
+        if ($order->status !== 'delivered') {
+            abort(422, 'Solo se puede solicitar una devolución de pedidos entregados.');
+        }
+
+        if ($order->returnRequests()->exists()) {
+            abort(422, 'Ya existe una solicitud de devolución para este pedido.');
+        }
 
         $return = ReturnRequest::query()->create([
             ...$data,
@@ -216,7 +246,7 @@ class OrderController extends Controller
             'status' => 'open',
         ]);
 
-        return response()->json(['data' => $return], 201);
+        return response()->json(['data' => $return->load('order.items.product', 'buyer')], 201);
     }
 
     public function createPaymentIntent(Request $request, int $orderId): JsonResponse

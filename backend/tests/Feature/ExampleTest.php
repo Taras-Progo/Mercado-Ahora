@@ -8,6 +8,7 @@ use App\Models\Conversation;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\ProducerProfile;
+use App\Models\ReturnRequest;
 use App\Models\User;
 use App\Models\ProductImage;
 use App\Models\ProductFavorite;
@@ -1117,7 +1118,7 @@ class ExampleTest extends TestCase
         $this->actingAs($buyer, 'sanctum')
             ->postJson('/api/v1/auth/email/verify')
             ->assertOk()
-            ->assertJsonPath('data.message', 'Te enviamos un email de verificacion.');
+            ->assertJsonPath('data.message', 'Te enviamos un email de verificación.');
 
         Notification::assertSentTo($buyer, FrontendVerifyEmailNotification::class);
 
@@ -1262,5 +1263,176 @@ class ExampleTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.pending_orders_count', 1)
             ->assertJsonPath('data.profile_completion_percent', 10);
+    }
+
+    public function test_buyer_can_request_one_return_for_their_delivered_order(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $product = Product::query()->where('status', 'active')->firstOrFail();
+
+        $orderResponse = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', [
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'delivery_type' => 'local',
+            ])
+            ->assertCreated();
+
+        $order = Order::query()->findOrFail($orderResponse->json('data.id'));
+        $order->update(['status' => 'delivered']);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson("/api/v1/orders/{$order->id}/returns", [
+                'reason' => 'El producto llegó dañado',
+                'details' => 'Necesito coordinar devolución.',
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'open')
+            ->assertJsonPath('data.reason', 'El producto llegó dañado')
+            ->assertJsonPath('data.order.id', $order->id);
+
+        $this->assertDatabaseHas('return_requests', [
+            'order_id' => $order->id,
+            'buyer_id' => $buyer->id,
+            'status' => 'open',
+        ]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson("/api/v1/orders/{$order->id}/returns", [
+                'reason' => 'Segunda solicitud',
+            ])
+            ->assertUnprocessable();
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/returns')
+            ->assertOk()
+            ->assertJsonFragment(['reason' => 'El producto llegó dañado']);
+    }
+
+    public function test_buyer_cannot_request_return_for_another_buyers_order_or_pending_order(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $otherBuyer = User::factory()->create(['role' => 'buyer', 'status' => 'active']);
+        $product = Product::query()->where('status', 'active')->firstOrFail();
+
+        $orderResponse = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', [
+                'product_id' => $product->id,
+                'quantity' => 1,
+                'delivery_type' => 'local',
+            ])
+            ->assertCreated();
+
+        $orderId = $orderResponse->json('data.id');
+
+        $this->actingAs($buyer, 'sanctum')
+            ->postJson("/api/v1/orders/{$orderId}/returns", ['reason' => 'Quiero devolver'])
+            ->assertUnprocessable();
+
+        Order::query()->findOrFail($orderId)->update(['status' => 'delivered']);
+
+        $this->actingAs($otherBuyer, 'sanctum')
+            ->postJson("/api/v1/orders/{$orderId}/returns", ['reason' => 'Pedido ajeno'])
+            ->assertNotFound();
+    }
+
+    public function test_seller_sees_only_returns_for_orders_containing_their_products(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $sellerProduct = Product::query()->with('producerProfile.user')->where('status', 'active')->firstOrFail();
+        $seller = $sellerProduct->producerProfile->user;
+        $category = Category::query()->firstOrFail();
+
+        $otherSeller = User::factory()->create(['role' => 'seller', 'status' => 'active']);
+        $otherProfile = ProducerProfile::query()->create([
+            'user_id' => $otherSeller->id,
+            'business_name' => 'Otro Productor Returns',
+            'slug' => 'otro-productor-returns',
+            'status' => 'active',
+        ]);
+        $otherProduct = Product::query()->create([
+            'producer_profile_id' => $otherProfile->id,
+            'category_id' => $category->id,
+            'name' => 'Producto otro return',
+            'slug' => 'producto-otro-return',
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 3,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $sellerOrder = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', ['product_id' => $sellerProduct->id, 'quantity' => 1])
+            ->assertCreated()
+            ->json('data.id');
+        $otherOrder = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', ['product_id' => $otherProduct->id, 'quantity' => 1])
+            ->assertCreated()
+            ->json('data.id');
+
+        ReturnRequest::query()->create([
+            'order_id' => $sellerOrder,
+            'buyer_id' => $buyer->id,
+            'reason' => 'Return seller product',
+            'status' => 'open',
+        ]);
+        ReturnRequest::query()->create([
+            'order_id' => $otherOrder,
+            'buyer_id' => $buyer->id,
+            'reason' => 'Return other product',
+            'status' => 'open',
+        ]);
+
+        $this->actingAs($seller, 'sanctum')
+            ->getJson('/api/v1/seller/returns')
+            ->assertOk()
+            ->assertJsonFragment(['reason' => 'Return seller product'])
+            ->assertJsonMissing(['reason' => 'Return other product']);
+    }
+
+    public function test_admin_can_complete_return_and_marks_order_returned_with_history(): void
+    {
+        $this->seed();
+
+        $admin = User::query()->where('email', 'admin@mercadoahora.com')->firstOrFail();
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $product = Product::query()->where('status', 'active')->firstOrFail();
+
+        $orderId = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/buy-now', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated()
+            ->json('data.id');
+
+        Order::query()->findOrFail($orderId)->update(['status' => 'delivered']);
+
+        $return = ReturnRequest::query()->create([
+            'order_id' => $orderId,
+            'buyer_id' => $buyer->id,
+            'reason' => 'Producto no corresponde',
+            'status' => 'open',
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->patchJson("/api/v1/admin/returns/{$return->id}/status", ['status' => 'completed'])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'completed')
+            ->assertJsonPath('data.order.status', 'returned');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $orderId,
+            'status' => 'returned',
+        ]);
+        $this->assertDatabaseHas('order_status_histories', [
+            'order_id' => $orderId,
+            'changed_by' => $admin->id,
+            'status' => 'returned',
+        ]);
     }
 }

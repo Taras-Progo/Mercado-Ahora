@@ -16,6 +16,8 @@ import {
   money,
   orderStatusLabel,
   orderStatusColor,
+  returnStatusColor,
+  returnStatusLabel,
   deliveryTypeLabel,
   SELLER_ORDER_STATUSES,
 } from "@/lib/api";
@@ -323,6 +325,31 @@ function SellerOrdersView() {
                             {creatingConversationId === order.id ? "Abriendo chat..." : "Enviar mensaje al comprador"}
                           </button>
                         </div>
+
+                        {detail?.return_requests && detail.return_requests.length > 0 && (
+                          <div className="rounded-xl border border-border-soft bg-cream-card p-3 text-sm">
+                            <p className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+                              Devoluciones
+                            </p>
+                            <div className="mt-2 grid gap-2">
+                              {detail.return_requests.map((request) => (
+                                <div key={request.id} className="rounded-xl bg-white p-3">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${returnStatusColor(request.status)}`}>
+                                      {returnStatusLabel(request.status)}
+                                    </span>
+                                    <span className="text-xs text-stone-500">Solicitud #{request.id}</span>
+                                  </div>
+                                  <p className="mt-2 font-medium text-foreground">{request.reason}</p>
+                                  {request.details && <p className="mt-1 text-xs text-brown-muted">{request.details}</p>}
+                                  <Link href="/seller/returns" className="mt-2 inline-block text-xs font-semibold text-olive-dark hover:underline">
+                                    Ver devoluciones
+                                  </Link>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Status update */}
                         <div className="flex flex-col gap-2 border-t border-border-soft pt-4 sm:flex-row sm:items-center sm:justify-between">
