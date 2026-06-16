@@ -118,9 +118,7 @@ function OrdersContent() {
     return (
       <>
         <SiteHeader />
-        <main className="bg-background py-24 text-center text-sm text-stone-500">
-          Cargando pedidos...
-        </main>
+        <main className="bg-background py-24 text-center text-sm text-stone-500">Cargando pedidos...</main>
         <SiteFooter />
       </>
     );
@@ -144,7 +142,7 @@ function OrdersContent() {
           {orders.length === 0 ? (
             <div className="mt-12 text-center">
               <PackageIcon className="mx-auto h-12 w-12 text-stone-300" />
-              <p className="mt-4 text-sm text-stone-500">No tenés pedidos todavía.</p>
+              <p className="mt-4 text-sm text-stone-500">Todavía no tenés pedidos.</p>
               <Link
                 href="/categorias"
                 className="mt-4 inline-block rounded-full bg-olive px-6 py-3 text-sm font-semibold text-white transition hover:bg-olive-dark"
@@ -319,9 +317,7 @@ function OrderDetails({
             </button>
           </div>
         ) : (
-          <p className="mt-2 text-sm text-brown-muted">
-            La devolución se habilita cuando el pedido figura como entregado.
-          </p>
+          <p className="mt-2 text-sm text-brown-muted">La devolución se habilita cuando el pedido figura como entregado.</p>
         )}
         {feedback?.text && (
           <p className={`mt-3 rounded-xl px-4 py-2 text-sm ${feedback.tone === "error" ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>

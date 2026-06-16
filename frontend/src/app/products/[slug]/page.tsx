@@ -21,7 +21,7 @@ import { ProductCard } from "@/components/ui/ProductCard";
 import { FavoriteButton } from "@/components/ui/FavoriteButton";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { useAuth } from "@/components/AuthProvider";
+import { currentPathWithSearch, loginRedirectUrl, useAuth } from "@/components/AuthProvider";
 import {
   ChevronRightIcon,
   CheckCircleIcon,
@@ -90,7 +90,7 @@ export default function ProductDetailPage() {
   // Handle Add to Cart
   const handleAddToCart = async () => {
     if (!isLoggedIn) {
-      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      router.push(loginRedirectUrl(currentPathWithSearch()));
       return;
     }
     if (!product) return;
@@ -133,7 +133,7 @@ export default function ProductDetailPage() {
   // Handle Chat with Producer
   const handleChat = async () => {
     if (!isLoggedIn) {
-      router.push(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      router.push(loginRedirectUrl(currentPathWithSearch()));
       return;
     }
     if (!product) return;
@@ -389,9 +389,7 @@ export default function ProductDetailPage() {
                     type="button"
                     onClick={() => {
                       if (!isLoggedIn) {
-                        router.push(
-                          `/login?redirect=${encodeURIComponent(window.location.pathname)}`
-                        );
+                        router.push(loginRedirectUrl(currentPathWithSearch()));
                         return;
                       }
                       setBuyError("");
@@ -456,7 +454,7 @@ export default function ProductDetailPage() {
                 {/* Login prompt for unauthenticated users */}
                 {!isLoggedIn && !isOwnProduct && (
                   <p className="text-center text-xs text-stone-400">
-                    <Link href={`/login?redirect=${encodeURIComponent(window.location.pathname)}`} className="text-olive hover:underline">
+                    <Link href={loginRedirectUrl(currentPathWithSearch())} className="text-olive hover:underline">
                       Iniciá sesión
                     </Link>{" "}
                     para comprar o contactar al productor.

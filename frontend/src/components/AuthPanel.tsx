@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
-import { parseApiMessage, producerStatusOf, roleHome, useAuth } from "@/components/AuthProvider";
+import { useRouter, useSearchParams } from "next/navigation";
+import { parseApiMessage, producerStatusOf, resolveRedirectPath, roleHome, useAuth } from "@/components/AuthProvider";
 import { applyAsSeller, type SellerApplyPayload } from "@/lib/api";
 import { CheckCircleIcon, ClockIcon, EyeIcon, LeafIcon } from "@/components/ui/Icons";
 
@@ -19,10 +19,9 @@ export function AuthPanel({ mode }: { mode: Mode }) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, user, ready, refresh } = useAuth();
 
-  // A logged-in user reaching the producer application upgrades their existing
-  // account instead of registering a brand-new one (no second email needed).
   const loggedIn = ready && !!user;
   const sellerUpgrade = mode === "seller-apply" && loggedIn;
   const producerStatus = producerStatusOf(user);
@@ -42,14 +41,13 @@ export function AuthPanel({ mode }: { mode: Mode }) {
     const form = new FormData(event.currentTarget);
     const body = Object.fromEntries(form.entries());
 
-    // Existing account becoming a producer: authenticated upgrade.
     if (sellerUpgrade) {
       try {
         const result = await applyAsSeller(body as unknown as SellerApplyPayload);
         await refresh();
         setMessage({
           tone: "success",
-          text: result.message ?? "Postulación enviada. Te avisaremos al aprobarla.",
+          text: result.message ?? "Postulación enviada. Te avisaremos cuando quede aprobada.",
         });
         router.push("/seller");
       } catch (err) {
@@ -77,10 +75,10 @@ export function AuthPanel({ mode }: { mode: Mode }) {
       const data = json.data ?? json;
       if (data.token && data.user) {
         login(data.token, data.user, body.remember === "on");
-        setMessage({ tone: "success", text: "¡Listo! Redirigiendo..." });
-        router.push(roleHome(data.user.role));
+        setMessage({ tone: "success", text: "Listo. Te estamos redirigiendo..." });
+        router.push(resolveRedirectPath(searchParams.get("redirect"), roleHome(data.user.role)));
       } else {
-        setMessage({ tone: "success", text: "Postulación recibida. Te avisaremos al aprobarla." });
+        setMessage({ tone: "success", text: "Postulación recibida. Te avisaremos cuando quede aprobada." });
       }
     } catch {
       setMessage({ tone: "error", text: "No se pudo conectar con la API." });
@@ -89,7 +87,6 @@ export function AuthPanel({ mode }: { mode: Mode }) {
     }
   }
 
-  // Avoid flashing the anonymous (email/password) form while auth state loads.
   if (mode === "seller-apply" && !ready) {
     return (
       <div className="grid gap-3">
@@ -100,7 +97,6 @@ export function AuthPanel({ mode }: { mode: Mode }) {
     );
   }
 
-  // Already applied / already a producer: show status instead of the form.
   if (sellerUpgrade && (producerStatus === "pending" || producerStatus === "active")) {
     return <ProducerStatusPanel status={producerStatus} />;
   }
@@ -233,12 +229,12 @@ function ProducerStatusPanel({ status }: { status: "pending" | "active" }) {
         </span>
         <div>
           <p className={`text-sm font-semibold ${pending ? "text-amber-900" : "text-olive-dark"}`}>
-            {pending ? "Tu postulación está en revisión" : "¡Tu cuenta ya es productora!"}
+            {pending ? "Tu postulación está en revisión" : "Tu cuenta ya es productora"}
           </p>
           <p className={`mt-1 text-sm ${pending ? "text-amber-800" : "text-olive-dark/80"}`}>
             {pending
               ? "Un administrador la evaluará pronto. Mientras tanto seguís pudiendo comprar con tu cuenta."
-              : "Podés gestionar tus productos y pedidos desde el panel del productor, y seguir comprando normalmente."}
+              : "Podés gestionar tus productos y pedidos desde el panel del productor y seguir comprando normalmente."}
           </p>
         </div>
       </div>

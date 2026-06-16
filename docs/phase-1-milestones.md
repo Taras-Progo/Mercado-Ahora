@@ -22,7 +22,7 @@ Status: Complete
 - Admin role access.
 - Email verification and password recovery through Resend.
 - Admin temporary password reset backup.
-- Stale-while-revalidate auth hydration to reduce “Validando sesión...” waits.
+- Stale-while-revalidate auth hydration to reduce "Validando sesión..." waits.
 
 ## Milestone 3 - Producer Products And Catalog
 
@@ -44,10 +44,12 @@ Status: Complete for Phase 1 MVP
 - Product favorites system.
 - Product-linked buyer/producer chat.
 - Order-linked chat from seller order detail.
+- Public browsing for product and producer pages, with login required only for protected interactions.
 - Buy now flow.
 - Add to cart flow.
 - Shopping cart page.
 - Checkout from cart.
+- Checkout recovery when stock changes, including inline quantity adjustment, remove item, and `Ajustar al stock disponible`.
 - Order creation from buy now and cart.
 - Stock validation and decrement at order creation.
 - Buyer and seller order views.
@@ -84,6 +86,22 @@ Status: Complete for Phase 1 MVP
 - No advanced notifications center.
 - No followers/posts/community module in active navigation.
 - EcoScore is basic/manual and can be expanded later.
+
+## Additional Scope Added During Client Feedback
+
+The following items were introduced after the original milestone checklist and are now part of the Phase 1 implementation direction:
+
+- Anonymous public browsing for product and producer pages.
+- Redirect-back-after-login intent preservation for protected actions.
+- Stronger commercial Spanish copy cleanup across the purchase funnel.
+- SEO/indexability direction for public marketplace pages.
+
+Future follow-up work related to that SEO direction is still pending and out of scope for this pass:
+
+- richer metadata for products and producers,
+- structured data,
+- canonical handling,
+- share-preview hardening.
 
 ## Verification
 

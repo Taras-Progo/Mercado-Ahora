@@ -23,6 +23,23 @@ const socialPlatforms = [
   { key: "website", label: "Sitio web", placeholder: "https://tu-sitio.com" },
 ] as const;
 
+const productionOriginOptions = [
+  { value: "produccion_propia", label: "Producción propia" },
+  { value: "productor_directo", label: "Productor directo" },
+  { value: "cooperativa", label: "Cooperativa" },
+  { value: "familiar", label: "Emprendimiento familiar" },
+  { value: "local_comunitario", label: "Producción local comunitaria" },
+] as const;
+
+const productionMethodOptions = [
+  { value: "natural", label: "Natural" },
+  { value: "agroecologico", label: "Agroecológico" },
+  { value: "organico", label: "Orgánico" },
+  { value: "artesanal", label: "Artesanal" },
+  { value: "regional", label: "Regional" },
+  { value: "industrial", label: "Industrial" },
+] as const;
+
 type SocialKey = (typeof socialPlatforms)[number]["key"];
 
 export function SellerProfileForm() {
@@ -45,6 +62,7 @@ export function SellerProfileForm() {
     story: "",
     digital_presence_notes: "",
   });
+
   const [socialForm, setSocialForm] = useState<Record<SocialKey, string>>({
     whatsapp: "",
     instagram: "",
@@ -57,6 +75,7 @@ export function SellerProfileForm() {
     const [profileData, socialLinks] = await Promise.all([getSellerProfile(), getSellerSocialLinks()]);
     setProfile(profileData);
     setLinks(socialLinks);
+
     if (profileData) {
       setForm({
         business_name: profileData.business_name ?? "",
@@ -72,6 +91,7 @@ export function SellerProfileForm() {
         digital_presence_notes: profileData.digital_presence_notes ?? "",
       });
     }
+
     setSocialForm((current) => {
       const next = { ...current };
       for (const item of socialLinks) {
@@ -81,12 +101,16 @@ export function SellerProfileForm() {
       }
       return next;
     });
+
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void hydrate();
+    const timeoutId = window.setTimeout(() => {
+      void hydrate();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [hydrate]);
 
   const completion = useMemo(() => {
@@ -121,13 +145,15 @@ export function SellerProfileForm() {
     }
 
     setSaving(true);
+
     try {
-      const saved = await saveSellerProfile(cleanPayload(form));
+      const savedProfile = await saveSellerProfile(cleanPayload(form));
       const savedLinks: ProducerSocialLink[] = [];
 
       for (const platform of socialPlatforms) {
         const value = socialForm[platform.key].trim();
         if (!value) continue;
+
         savedLinks.push(
           await saveSellerSocialLink({
             platform: platform.key,
@@ -137,10 +163,11 @@ export function SellerProfileForm() {
         );
       }
 
-      setProfile(saved);
+      setProfile(savedProfile);
       if (savedLinks.length > 0) {
         setLinks((current) => mergeLinks(current, savedLinks));
       }
+
       setFeedback({ tone: "success", text: "Perfil público actualizado correctamente." });
     } catch (error) {
       setFeedback({
@@ -184,6 +211,7 @@ export function SellerProfileForm() {
               Estos datos ayudan a que los compradores conozcan tu emprendimiento, tu historia y tus canales de contacto.
             </p>
           </div>
+
           <div className="rounded-2xl border border-border-soft bg-cream-card p-4 text-sm text-stone-600 md:w-64">
             <p className="font-semibold text-stone-800">Perfil completo</p>
             <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
@@ -200,9 +228,10 @@ export function SellerProfileForm() {
             value={form.business_name}
             onChange={(event) => updateField("business_name", event.target.value)}
             className={inputClass}
-            placeholder="Ej: Finca Raíces Verdes"
+            placeholder="Ej: Finca Raices Verdes"
           />
         </Field>
+
         <Field label="Logo o foto principal">
           <div className="flex items-center gap-4 rounded-xl border border-dashed border-border-soft bg-cream-card p-4">
             {profile?.logo_path ? (
@@ -213,10 +242,11 @@ export function SellerProfileForm() {
               </span>
             )}
             <p className="text-xs leading-5 text-stone-500">
-              Logo del emprendimiento se cargará en una mejora posterior. Podés completar el resto del perfil ahora.
+              La carga del logo quedará en una mejora posterior. Ya podés completar el resto del perfil sin bloquear el flujo.
             </p>
           </div>
         </Field>
+
         <Field label="Provincia">
           <input
             value={form.province}
@@ -225,6 +255,7 @@ export function SellerProfileForm() {
             placeholder="Ej: San Luis"
           />
         </Field>
+
         <Field label="Ciudad">
           <input
             value={form.city}
@@ -233,48 +264,74 @@ export function SellerProfileForm() {
             placeholder="Ej: Villa de Merlo"
           />
         </Field>
+
         <Field label="Descripción del emprendimiento" className="sm:col-span-2">
           <textarea
             value={form.description}
             onChange={(event) => updateField("description", event.target.value)}
             rows={4}
             className={`${inputClass} resize-y`}
-            placeholder="Contá qué producís, cómo trabajás y qué te diferencia."
+            placeholder="Cuenta qué produces, cómo trabajas y qué te diferencia."
           />
         </Field>
+
         <Field label="Historia del productor" className="sm:col-span-2">
           <textarea
             value={form.story}
             onChange={(event) => updateField("story", event.target.value)}
             rows={4}
             className={`${inputClass} resize-y`}
-            placeholder="Compartí la historia del emprendimiento y el camino recorrido."
+            placeholder="Comparte la historia del emprendimiento y el camino recorrido."
           />
         </Field>
-        <Field label="Origen / lugar de producción">
-          <input
+
+        <Field label="Origen de la producción">
+          <select
             value={form.production_origin}
             onChange={(event) => updateField("production_origin", event.target.value)}
             className={inputClass}
-            placeholder="Ej: Sierra de los Comechingones"
-          />
+          >
+            <option value="">Seleccionar origen...</option>
+            {productionOriginOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+            {form.production_origin &&
+              !productionOriginOptions.some((option) => option.value === form.production_origin) && (
+                <option value={form.production_origin}>{form.production_origin}</option>
+              )}
+          </select>
         </Field>
+
         <Field label="Método de producción">
-          <input
+          <select
             value={form.production_method}
             onChange={(event) => updateField("production_method", event.target.value)}
             className={inputClass}
-            placeholder="Ej: artesanal, agroecológico, familiar"
-          />
+          >
+            <option value="">Seleccionar metodo...</option>
+            {productionMethodOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+            {form.production_method &&
+              !productionMethodOptions.some((option) => option.value === form.production_method) && (
+                <option value={form.production_method}>{form.production_method}</option>
+              )}
+          </select>
         </Field>
+
         <Field label="Tipos de productos">
           <input
             value={form.product_types}
             onChange={(event) => updateField("product_types", event.target.value)}
             className={inputClass}
-            placeholder="Ej: miel, conservas, cosmética natural"
+            placeholder="Ej: miel, conservas, cosmetica natural"
           />
         </Field>
+
         <Field label="Prácticas de producción">
           <input
             value={form.production_practices}
@@ -283,13 +340,14 @@ export function SellerProfileForm() {
             placeholder="Ej: sin químicos, producción responsable"
           />
         </Field>
+
         <Field label="Información pública adicional" className="sm:col-span-2">
           <textarea
             value={form.digital_presence_notes}
             onChange={(event) => updateField("digital_presence_notes", event.target.value)}
             rows={3}
             className={`${inputClass} resize-y`}
-            placeholder="Información que querés que los compradores sepan antes de contactarte."
+            placeholder="Información que quieres que los compradores sepan antes de contactarte."
           />
         </Field>
       </section>
@@ -299,6 +357,7 @@ export function SellerProfileForm() {
         <p className="mt-1 text-sm text-stone-600">
           Estos enlaces pueden mostrarse en tu perfil público para facilitar consultas de compradores.
         </p>
+
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {socialPlatforms.map((platform) => (
             <Field key={platform.key} label={platform.label}>
@@ -311,10 +370,9 @@ export function SellerProfileForm() {
             </Field>
           ))}
         </div>
+
         {links.length > 0 && (
-          <p className="mt-4 text-xs text-stone-500">
-            Redes guardadas: {links.map((link) => link.platform).join(", ")}.
-          </p>
+          <p className="mt-4 text-xs text-stone-500">Redes guardadas: {links.map((link) => link.platform).join(", ")}.</p>
         )}
       </section>
 

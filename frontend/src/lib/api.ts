@@ -128,6 +128,15 @@ export type Cart = {
   items?: CartItem[];
 };
 
+export type CheckoutConflict = {
+  item_id?: number;
+  product_id: number;
+  product_name: string;
+  requested_quantity: number;
+  available_stock: number;
+  status?: string;
+};
+
 export type Conversation = {
   id: number;
   buyer_id: number;
@@ -151,6 +160,18 @@ export type Message = {
   created_at: string;
   sender?: { id: number; name: string };
 };
+
+export class ApiError extends Error {
+  status: number;
+  payload: unknown;
+
+  constructor(message: string, status: number, payload: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.payload = payload;
+  }
+}
 
 const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 const INTERNAL_API_BASE =
@@ -265,7 +286,7 @@ export function statusLabel(status?: string) {
     case "rejected": return "Rechazado";
     case "pending": return "Pendiente";
     case "suspended": return "Suspendido";
-    default: return status ?? "";
+    default: return status ? humanizeInternalLabel(status) : "";
   }
 }
 
@@ -289,7 +310,7 @@ export function productionTypeLabel(type?: string) {
     regional: "Regional",
     industrial: "Industrial",
   };
-  return type ? (labels[type] ?? type) : "";
+  return type ? (labels[type] ?? humanizeInternalLabel(type)) : "";
 }
 
 export function deliveryTypeLabel(type?: string) {
@@ -299,7 +320,24 @@ export function deliveryTypeLabel(type?: string) {
     pickup_point: "Punto de entrega",
     producer_pickup: "Retiro en el local",
   };
-  return type ? (labels[type] ?? type) : "";
+  return type ? (labels[type] ?? humanizeInternalLabel(type)) : "";
+}
+
+export function productionOriginLabel(value?: string) {
+  const labels: Record<string, string> = {
+    produccion_propia: "Producci\u00f3n propia",
+    productor_directo: "Productor directo",
+    cooperativa: "Cooperativa",
+    familiar: "Emprendimiento familiar",
+    local_comunitario: "Producci\u00f3n local comunitaria",
+  };
+  return value ? (labels[value] ?? humanizeInternalLabel(value)) : "";
+}
+
+function humanizeInternalLabel(value: string) {
+  const normalized = value.trim().replace(/[_-]+/g, " ");
+  if (!normalized) return "";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
 // ---- Public API (unauthenticated) ----
@@ -390,8 +428,7 @@ async function authFetch(path: string, options: RequestInit = {}): Promise<Respo
 async function apiAuthGet<T>(path: string): Promise<T> {
   const response = await authFetch(path);
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "Error de red" }));
-    throw new Error(error.message ?? "Error de red");
+    throw await parseApiError(response);
   }
   const json = await response.json();
   return json.data ?? json;
@@ -403,8 +440,7 @@ async function apiAuthPost<T>(path: string, body: unknown): Promise<T> {
     body: body instanceof FormData ? body : JSON.stringify(body),
   });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "Error de red" }));
-    throw new Error(error.message ?? "Error de red");
+    throw await parseApiError(response);
   }
   const json = await response.json();
   return json.data ?? json;
@@ -416,8 +452,7 @@ async function apiAuthPatch<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "Error de red" }));
-    throw new Error(error.message ?? "Error de red");
+    throw await parseApiError(response);
   }
   const json = await response.json();
   return json.data ?? json;
@@ -426,11 +461,19 @@ async function apiAuthPatch<T>(path: string, body: unknown): Promise<T> {
 async function apiAuthDelete<T>(path: string): Promise<T> {
   const response = await authFetch(path, { method: "DELETE" });
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: "Error de red" }));
-    throw new Error(error.message ?? "Error de red");
+    throw await parseApiError(response);
   }
   const json = await response.json();
   return json.data ?? json;
+}
+
+async function parseApiError(response: Response): Promise<ApiError> {
+  const payload = await response.json().catch(() => ({ message: "Error de red" }));
+  const message =
+    (typeof payload?.message === "string" && payload.message) ||
+    (typeof payload?.data?.message === "string" && payload.data.message) ||
+    "Error de red";
+  return new ApiError(message, response.status, payload);
 }
 
 // ---- Favorites API ----
@@ -883,7 +926,7 @@ export function orderStatusLabel(status?: string): string {
     cancelled: "Cancelado",
     returned: "Devuelto",
   };
-  return status ? (labels[status] ?? status) : "";
+  return status ? (labels[status] ?? humanizeInternalLabel(status)) : "";
 }
 
 export const ADMIN_ORDER_STATUSES = [
@@ -905,7 +948,7 @@ export function returnStatusLabel(status?: string): string {
     rejected: "Rechazada",
     completed: "Completada",
   };
-  return status ? (labels[status] ?? status) : "";
+  return status ? (labels[status] ?? humanizeInternalLabel(status)) : "";
 }
 
 export function returnStatusColor(status?: string): string {

@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\PaymentIntent;
 use App\Models\Product;
 use App\Models\ReturnRequest;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +57,7 @@ class OrderController extends Controller
         }
 
         $items = $cart->items->map(fn ($item) => [
+            'item_id' => $item->id,
             'product_id' => $item->product->id,
             'producer_profile_id' => $item->product->producer_profile_id,
             'product' => $item->product,
@@ -64,15 +66,22 @@ class OrderController extends Controller
             'unit_price_cents' => $item->unit_price_cents_snapshot ?? $item->product->price_cents,
         ])->all();
 
-        // Validate stock for all cart items
+        $conflicts = [];
         foreach ($items as $item) {
             $product = $item['product'];
-            if ($product->stock !== null && $item['quantity'] > $product->stock) {
-                abort(422, "Stock insuficiente para \"{$product->name}\". Solo quedan {$product->stock} disponibles.");
-            }
+
             if ($product->status !== 'active') {
-                abort(422, "El producto \"{$product->name}\" ya no está disponible.");
+                $conflicts[] = $this->checkoutConflict($item, $product->stock ?? 0, $product->status);
+                continue;
             }
+
+            if ($product->stock !== null && $item['quantity'] > $product->stock) {
+                $conflicts[] = $this->checkoutConflict($item, $product->stock, $product->status);
+            }
+        }
+
+        if (! empty($conflicts)) {
+            $this->abortCheckoutConflicts($conflicts);
         }
 
         $orders = $this->createGroupedOrders($request, $items, $data + ['delivery_type' => $cart->delivery_type]);
@@ -82,7 +91,7 @@ class OrderController extends Controller
             'data' => [
                 'orders' => $orders,
                 'orders_count' => count($orders),
-                'message' => 'Checkout único procesado. Se generaron pedidos separados por productor.',
+                'message' => 'Compra confirmada. Se generaron pedidos separados por productor.',
             ],
         ], 201);
     }
@@ -356,15 +365,21 @@ class OrderController extends Controller
                 $quantity = (int) $item['quantity'];
 
                 if ($product->status !== 'active') {
-                    abort(422, "El producto \"{$product->name}\" ya no está disponible.");
+                    $this->abortCheckoutConflicts([
+                        $this->checkoutConflict($item, $product->stock ?? 0, $product->status),
+                    ]);
                 }
 
                 if ($product->stock !== null && $quantity > $product->stock) {
-                    abort(422, "Stock insuficiente para \"{$product->name}\". Solo quedan {$product->stock} disponibles.");
+                    $this->abortCheckoutConflicts([
+                        $this->checkoutConflict($item, $product->stock, $product->status),
+                    ]);
                 }
 
                 return [
+                    'item_id' => $item['item_id'] ?? null,
                     'product' => $product,
+                    'product_id' => $product->id,
                     'quantity' => $quantity,
                     'product_name' => $item['product_name'] ?? $product->name,
                     'unit_price_cents' => $item['unit_price_cents'] ?? $product->price_cents,
@@ -377,9 +392,35 @@ class OrderController extends Controller
     {
         return [
             'product' => $product,
+            'product_id' => $product->id,
             'quantity' => $quantity,
             'product_name' => $product->name,
             'unit_price_cents' => $product->price_cents,
         ];
+    }
+
+    private function checkoutConflict(array $item, int $availableStock, ?string $status = null): array
+    {
+        return [
+            'item_id' => $item['item_id'] ?? null,
+            'product_id' => $item['product_id'] ?? $item['product']->id,
+            'product_name' => $item['product_name'] ?? $item['product']->name,
+            'requested_quantity' => (int) $item['quantity'],
+            'available_stock' => $availableStock,
+            'status' => $status,
+        ];
+    }
+
+    private function abortCheckoutConflicts(array $conflicts): never
+    {
+        $first = $conflicts[0];
+        $message = ($first['status'] ?? 'active') !== 'active'
+            ? "El producto \"{$first['product_name']}\" ya no está disponible."
+            : "Stock insuficiente para \"{$first['product_name']}\". Solo quedan {$first['available_stock']} disponibles.";
+
+        throw new HttpResponseException(response()->json([
+            'message' => $message,
+            'conflicts' => $conflicts,
+        ], 422));
     }
 }

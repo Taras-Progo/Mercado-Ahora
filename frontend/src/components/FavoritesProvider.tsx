@@ -11,7 +11,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { addFavorite, getFavoriteIds, removeFavorite } from "@/lib/api";
-import { useAuth } from "@/components/AuthProvider";
+import { loginRedirectUrl, useAuth } from "@/components/AuthProvider";
 
 type FavoritesContextValue = {
   favoriteIds: number[];
@@ -78,7 +78,7 @@ export function FavoritesProvider({ children }: { children: ReactNode }) {
           (typeof window !== "undefined"
             ? `${window.location.pathname}${window.location.search}`
             : "/favoritos");
-        router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+        router.push(loginRedirectUrl(currentPath));
         return null;
       }
 

@@ -47,9 +47,7 @@ function ReturnsContent() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h1 className="font-serif text-3xl font-bold text-foreground">Mis devoluciones</h1>
-              <p className="mt-1 text-sm text-brown-muted">
-                Seguimiento de solicitudes vinculadas a tus pedidos.
-              </p>
+              <p className="mt-1 text-sm text-brown-muted">Seguimiento de solicitudes vinculadas a tus pedidos.</p>
             </div>
             <Link href="/orders" className="text-sm font-semibold text-olive-dark hover:underline">
               Volver a mis pedidos
@@ -64,7 +62,9 @@ function ReturnsContent() {
             <div className="mt-10 rounded-2xl border border-dashed border-border-soft bg-white p-10 text-center">
               <PackageIcon className="mx-auto h-10 w-10 text-stone-300" />
               <p className="mt-3 text-sm font-semibold text-stone-700">Todavía no solicitaste devoluciones.</p>
-              <p className="mt-1 text-xs text-stone-500">Cuando un pedido entregado requiera revisión, vas a poder iniciarla desde el detalle del pedido.</p>
+              <p className="mt-1 text-xs text-stone-500">
+                Cuando un pedido entregado requiera revisión, vas a poder iniciarla desde el detalle del pedido.
+              </p>
             </div>
           ) : (
             <div className="mt-6 grid gap-4">
@@ -82,9 +82,7 @@ function ReturnsContent() {
 
 function ReturnCard({ item }: { item: ReturnRequest }) {
   const order = item.order;
-  const productSummary = order?.items
-    ?.map((orderItem) => `${orderItem.product_name} x ${orderItem.quantity}`)
-    .join(", ");
+  const productSummary = order?.items?.map((orderItem) => `${orderItem.product_name} x ${orderItem.quantity}`).join(", ");
 
   return (
     <article className="rounded-2xl border border-border-soft bg-white p-5">

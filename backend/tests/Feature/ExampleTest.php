@@ -707,6 +707,108 @@ class ExampleTest extends TestCase
         $this->assertSame(1, $product->refresh()->stock);
     }
 
+    public function test_checkout_cart_returns_structured_conflicts_when_stock_changes_after_cart_addition(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+        $profile = ProducerProfile::query()->where('status', 'active')->firstOrFail();
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Miel en conflicto',
+            'slug' => 'miel-en-conflicto',
+            'price_cents' => 110000,
+            'currency' => 'ARS',
+            'stock' => 2,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $addResponse = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 2])
+            ->assertCreated();
+
+        $itemId = $addResponse->json('data.items.0.id');
+
+        $product->update(['stock' => 1]);
+
+        $response = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/cart', ['delivery_type' => 'local'])
+            ->assertStatus(422)
+            ->assertJsonStructure([
+                'message',
+                'conflicts' => [[
+                    'item_id',
+                    'product_id',
+                    'product_name',
+                    'requested_quantity',
+                    'available_stock',
+                    'status',
+                ]],
+            ]);
+
+        $response->assertJsonPath('conflicts.0.item_id', $itemId);
+        $response->assertJsonPath('conflicts.0.product_id', $product->id);
+        $response->assertJsonPath('conflicts.0.product_name', 'Miel en conflicto');
+        $response->assertJsonPath('conflicts.0.requested_quantity', 2);
+        $response->assertJsonPath('conflicts.0.available_stock', 1);
+        $response->assertJsonPath('conflicts.0.status', 'active');
+    }
+
+    public function test_checkout_cart_returns_structured_conflicts_for_inactive_products(): void
+    {
+        $this->seed();
+
+        $buyer = User::query()->where('email', 'maria@compradora.com')->firstOrFail();
+        $category = Category::query()->firstOrFail();
+        $profile = ProducerProfile::query()->where('status', 'active')->firstOrFail();
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Producto pausado en checkout',
+            'slug' => 'producto-pausado-en-checkout',
+            'price_cents' => 130000,
+            'currency' => 'ARS',
+            'stock' => 4,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $addResponse = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])
+            ->assertCreated();
+
+        $itemId = $addResponse->json('data.items.0.id');
+
+        $product->update(['status' => 'paused']);
+
+        $response = $this->actingAs($buyer, 'sanctum')
+            ->postJson('/api/v1/checkout/cart', ['delivery_type' => 'local'])
+            ->assertStatus(422)
+            ->assertJsonStructure([
+                'message',
+                'conflicts' => [[
+                    'item_id',
+                    'product_id',
+                    'product_name',
+                    'requested_quantity',
+                    'available_stock',
+                    'status',
+                ]],
+            ]);
+
+        $response->assertJsonPath('conflicts.0.item_id', $itemId);
+        $response->assertJsonPath('conflicts.0.product_id', $product->id);
+        $response->assertJsonPath('conflicts.0.product_name', 'Producto pausado en checkout');
+        $response->assertJsonPath('conflicts.0.requested_quantity', 1);
+        $response->assertJsonPath('conflicts.0.available_stock', 4);
+        $response->assertJsonPath('conflicts.0.status', 'paused');
+    }
+
     public function test_seller_status_update_creates_history_and_buyer_sees_new_status(): void
     {
         $this->seed();

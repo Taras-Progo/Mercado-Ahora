@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReactNode, useEffect } from "react";
-import { roleHome, UserRole, useAuth } from "@/components/AuthProvider";
+import { currentPathWithSearch, loginRedirectUrl, roleHome, UserRole, useAuth } from "@/components/AuthProvider";
 import { LeafIcon, XCircleIcon } from "@/components/ui/Icons";
 
 type RoleGuardProps = {
@@ -17,7 +17,7 @@ export function RoleGuard({ roles, children }: RoleGuardProps) {
 
   useEffect(() => {
     if (ready && !user) {
-      router.replace(`/login?redirect=${encodeURIComponent(window.location.pathname)}`);
+      router.replace(loginRedirectUrl(currentPathWithSearch()));
     }
   }, [ready, router, user]);
 
@@ -49,7 +49,7 @@ function GuardScreen({ variant, expected, currentRole }: ScreenProps) {
         <span className="mx-auto flex h-12 w-12 animate-pulse items-center justify-center rounded-full bg-olive-muted text-olive-dark">
           <LeafIcon className="h-5 w-5" />
         </span>
-        <p className="text-sm text-stone-600">Validando sesión…</p>
+        <p className="text-sm text-stone-600">Validando sesión...</p>
       </div>
     );
   }
@@ -57,7 +57,7 @@ function GuardScreen({ variant, expected, currentRole }: ScreenProps) {
   if (variant === "redirecting") {
     return (
       <div className="mx-auto grid max-w-md gap-4 rounded-3xl border border-border-soft bg-white p-10 text-center">
-        <p className="text-sm text-stone-600">Redirigiendo al ingreso…</p>
+        <p className="text-sm text-stone-600">Redirigiendo al ingreso...</p>
       </div>
     );
   }

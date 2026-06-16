@@ -4,10 +4,26 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { ProducerProfile } from "@/lib/api";
-import { getProducer, money, ecoLabel, ecoColor, deliveryTypeLabel, productionTypeLabel } from "@/lib/api";
+import {
+  getProducer,
+  money,
+  ecoLabel,
+  ecoColor,
+  deliveryTypeLabel,
+  productionOriginLabel,
+  productionTypeLabel,
+} from "@/lib/api";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { LeafIcon, MapPinIcon, PackageIcon, ChevronRightIcon, MessageIcon, HandshakeIcon, ShieldCheckIcon } from "@/components/ui/Icons";
+import {
+  LeafIcon,
+  MapPinIcon,
+  PackageIcon,
+  ChevronRightIcon,
+  MessageIcon,
+  HandshakeIcon,
+  ShieldCheckIcon,
+} from "@/components/ui/Icons";
 
 export default function ProducerDetailPage() {
   const params = useParams();
@@ -58,10 +74,13 @@ export default function ProducerDetailPage() {
       <>
         <SiteHeader />
         <main className="bg-background py-16">
-          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-10 text-center">
+          <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-10">
             <h1 className="font-serif text-2xl font-bold text-foreground">Productor no encontrado</h1>
-            <p className="mt-3 text-brown-muted">El productor que buscas no existe o no está disponible.</p>
-            <Link href="/productores" className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-olive hover:text-olive-dark transition-colors">
+            <p className="mt-3 text-brown-muted">El productor que buscás no existe o no está disponible.</p>
+            <Link
+              href="/productores"
+              className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-olive transition-colors hover:text-olive-dark"
+            >
               ← Volver al directorio
             </Link>
           </div>
@@ -75,10 +94,12 @@ export default function ProducerDetailPage() {
     <>
       <SiteHeader />
       <main className="bg-background">
-        {/* Producer Header */}
         <section className="border-b border-border-soft bg-white">
           <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-10 lg:py-14">
-            <Link href="/productores" className="inline-flex items-center gap-1.5 text-sm text-brown-muted hover:text-olive transition-colors mb-6">
+            <Link
+              href="/productores"
+              className="mb-6 inline-flex items-center gap-1.5 text-sm text-brown-muted transition-colors hover:text-olive"
+            >
               <ChevronRightIcon className="h-4 w-4 rotate-180" />
               Directorio de productores
             </Link>
@@ -88,42 +109,37 @@ export default function ProducerDetailPage() {
                 <LeafIcon className="h-10 w-10" />
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="font-serif text-3xl font-bold text-foreground sm:text-4xl">
-                  {producer.business_name}
-                </h1>
+                <h1 className="font-serif text-3xl font-bold text-foreground sm:text-4xl">{producer.business_name}</h1>
                 {producer.city && producer.province && (
                   <p className="mt-2 inline-flex items-center gap-1.5 text-base text-brown-muted">
-                    <MapPinIcon className="h-4 w-4 text-brown-icon shrink-0" />
+                    <MapPinIcon className="h-4 w-4 shrink-0 text-brown-icon" />
                     {producer.city}, {producer.province}
                   </p>
                 )}
                 {producer.description && (
-                  <p className="mt-4 text-base text-brown-muted leading-relaxed max-w-2xl">{producer.description}</p>
+                  <p className="mt-4 max-w-2xl text-base leading-relaxed text-brown-muted">{producer.description}</p>
                 )}
               </div>
             </div>
           </div>
         </section>
 
-        {/* Production Details */}
         <section className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-10">
           <div className="grid gap-8 lg:grid-cols-3">
-            <div className="lg:col-span-2 space-y-8">
-              {/* Story */}
+            <div className="space-y-8 lg:col-span-2">
               {producer.story && (
                 <div className="rounded-2xl border border-border-soft bg-white p-6">
                   <h2 className="flex items-center gap-2 font-serif text-xl font-semibold text-foreground">
                     <HandshakeIcon className="h-5 w-5 text-olive" />
                     Nuestra historia
                   </h2>
-                  <p className="mt-3 text-sm text-brown-muted leading-relaxed">{producer.story}</p>
+                  <p className="mt-3 text-sm leading-relaxed text-brown-muted">{producer.story}</p>
                 </div>
               )}
 
-              {/* Products */}
               {producer.products && producer.products.length > 0 && (
                 <div>
-                  <h2 className="flex items-center gap-2 font-serif text-xl font-semibold text-foreground mb-4">
+                  <h2 className="mb-4 flex items-center gap-2 font-serif text-xl font-semibold text-foreground">
                     <PackageIcon className="h-5 w-5 text-olive" />
                     Productos ({producer.products.length})
                   </h2>
@@ -132,10 +148,10 @@ export default function ProducerDetailPage() {
                       <Link
                         key={product.id}
                         href={`/products/${product.slug}`}
-                        className="group flex flex-col rounded-2xl border border-border-soft bg-white p-5 transition hover:shadow-md hover:-translate-y-0.5"
+                        className="group flex flex-col rounded-2xl border border-border-soft bg-white p-5 transition hover:-translate-y-0.5 hover:shadow-md"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-semibold text-foreground group-hover:text-olive-dark transition-colors line-clamp-2">
+                          <h3 className="line-clamp-2 font-semibold text-foreground transition-colors group-hover:text-olive-dark">
                             {product.name}
                           </h3>
                           {product.ecoscore_points && (
@@ -144,20 +160,14 @@ export default function ProducerDetailPage() {
                             </span>
                           )}
                         </div>
-                        {product.description && (
-                          <p className="mt-2 text-xs text-brown-muted line-clamp-2">{product.description}</p>
-                        )}
+                        {product.description && <p className="mt-2 line-clamp-2 text-xs text-brown-muted">{product.description}</p>}
                         <div className="mt-3 flex items-center justify-between">
                           <span className="text-lg font-bold text-olive">{money(product.price_cents)}</span>
                           <span className="text-xs text-brown-muted">
                             {product.unit} · Stock: {product.stock}
                           </span>
                         </div>
-                        {product.delivery_type && (
-                          <p className="mt-2 text-[11px] text-brown-muted/70">
-                            {deliveryTypeLabel(product.delivery_type)}
-                          </p>
-                        )}
+                        {product.delivery_type && <p className="mt-2 text-[11px] text-brown-muted/70">{deliveryTypeLabel(product.delivery_type)}</p>}
                       </Link>
                     ))}
                   </div>
@@ -165,11 +175,9 @@ export default function ProducerDetailPage() {
               )}
             </div>
 
-            {/* Sidebar */}
             <div className="space-y-5">
-              {/* Production Info */}
-              <div className="rounded-2xl border border-border-soft bg-cream-card p-5 space-y-4">
-                <h3 className="flex items-center gap-2 font-semibold text-foreground text-sm">
+              <div className="space-y-4 rounded-2xl border border-border-soft bg-cream-card p-5">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   <ShieldCheckIcon className="h-4 w-4 text-olive" />
                   Información de producción
                 </h3>
@@ -188,7 +196,7 @@ export default function ProducerDetailPage() {
                 {producer.production_origin && (
                   <div>
                     <p className="text-[11px] uppercase tracking-wide text-brown-muted/70">Origen</p>
-                    <p className="text-sm font-medium text-brown">{producer.production_origin}</p>
+                    <p className="text-sm font-medium text-brown">{productionOriginLabel(producer.production_origin)}</p>
                   </div>
                 )}
                 {producer.production_practices && (
@@ -199,13 +207,12 @@ export default function ProducerDetailPage() {
                 )}
               </div>
 
-              {/* Contact */}
               <div className="rounded-2xl border border-border-soft bg-white p-5">
-                <h3 className="flex items-center gap-2 font-semibold text-foreground text-sm mb-4">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
                   <MessageIcon className="h-4 w-4 text-olive" />
                   Contactar
                 </h3>
-                <p className="text-xs text-brown-muted leading-relaxed">
+                <p className="text-xs leading-relaxed text-brown-muted">
                   Para consultar por productos, precios o coordinar una entrega, iniciá una conversación con {producer.business_name}.
                 </p>
                 <Link

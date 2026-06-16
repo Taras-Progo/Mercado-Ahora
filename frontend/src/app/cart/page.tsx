@@ -202,7 +202,7 @@ function CartContent() {
                         type="button"
                         onClick={() => handleRemove(item.id)}
                         className="self-center text-stone-400 hover:text-red-500 transition shrink-0"
-                        aria-label="Remover producto"
+                        aria-label="Quitar producto"
                       >
                         <TrashIcon className="h-4 w-4" />
                       </button>
@@ -237,7 +237,7 @@ function CartContent() {
                   onClick={() => router.push("/checkout")}
                   className="w-full rounded-full bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-dark shadow-sm"
                 >
-                  Ir al checkout
+                  Finalizar compra
                 </button>
               </div>
             </>

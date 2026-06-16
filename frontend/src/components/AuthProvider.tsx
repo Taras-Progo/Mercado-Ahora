@@ -150,6 +150,24 @@ export function roleHome(role: UserRole | undefined) {
   return "/";
 }
 
+export function currentPathWithSearch() {
+  if (typeof window === "undefined") return "/";
+  return `${window.location.pathname}${window.location.search}`;
+}
+
+export function loginRedirectUrl(redirectPath?: string) {
+  const target = redirectPath ?? currentPathWithSearch();
+  return `/login?redirect=${encodeURIComponent(target)}`;
+}
+
+export function resolveRedirectPath(redirect?: string | null, fallback?: string) {
+  if (!redirect) return fallback ?? "/";
+  if (!redirect.startsWith("/") || redirect.startsWith("//")) {
+    return fallback ?? "/";
+  }
+  return redirect;
+}
+
 export function producerStatusOf(user: AuthUser | null) {
   return user?.producer_profile?.status ?? user?.producerProfile?.status ?? null;
 }
