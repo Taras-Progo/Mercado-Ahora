@@ -74,8 +74,9 @@ Status: Complete for Phase 1 MVP
   - Admin can approve, reject, or complete returns.
   - Completed return marks the order as `returned` and writes status history.
 - Admin users, producers, products, orders, and returns tabs.
+- Admin product moderation now shows producer business name, user name, email, producer-specific publication filtering, edit/status/delete actions, correction notes, and audit logging.
 - Footer pages added: `/ayuda`, `/contacto`, `/terminos`, `/privacidad`.
-- Final docs added: `docs/MVP_DELIVERY_GUIDE.md`, `docs/qa/milestone-5-checklist.md`.
+- Final docs added: `docs/MVP_DELIVERY_GUIDE.md`, `docs/qa/milestone-5-checklist.md`, `docs/resumen-hitos-mvp.md`, `docs/funcionalidades-implementadas.md`, `docs/manual-usuario-borrador.md`.
 
 ## Phase 1 Final MVP Limitations
 
@@ -84,6 +85,7 @@ Status: Complete for Phase 1 MVP
 - No reviews/ratings in MVP UI.
 - No support ticket system.
 - No advanced notifications center.
+- Header message/cart previews are documented as UX improvements and can be expanded after MVP closure.
 - No followers/posts/community module in active navigation.
 - EcoScore is basic/manual and can be expanded later.
 

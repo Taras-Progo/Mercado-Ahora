@@ -3,15 +3,18 @@
 namespace Tests\Feature;
 
 use App\Models\Product;
+use App\Models\AdminAuditLog;
 use App\Models\Category;
 use App\Models\Conversation;
 use App\Models\Order;
+use App\Models\Message;
 use App\Models\OrderItem;
 use App\Models\ProducerProfile;
 use App\Models\ReturnRequest;
 use App\Models\User;
 use App\Models\ProductImage;
 use App\Models\ProductFavorite;
+use App\Models\ProductModerationNote;
 use App\Notifications\FrontendResetPasswordNotification;
 use App\Notifications\FrontendVerifyEmailNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -1536,5 +1539,235 @@ class ExampleTest extends TestCase
             'changed_by' => $admin->id,
             'status' => 'returned',
         ]);
+    }
+
+    public function test_admin_products_include_producer_identity_and_can_be_searched_by_producer(): void
+    {
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $seller = User::factory()->create([
+            'name' => 'Gabriel Londero',
+            'email' => 'gabriel.londero@example.com',
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+
+        $profile = ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Finca Raices Verdes',
+            'slug' => 'finca-raices-verdes-admin',
+            'status' => 'active',
+            'province' => 'Cordoba',
+            'city' => 'Alta Gracia',
+        ]);
+
+        $otherSeller = User::factory()->create([
+            'name' => 'Otra Productora',
+            'email' => 'otra@example.com',
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+        $otherProfile = ProducerProfile::query()->create([
+            'user_id' => $otherSeller->id,
+            'business_name' => 'Otro Campo',
+            'slug' => 'otro-campo-admin',
+            'status' => 'active',
+        ]);
+
+        $category = Category::query()->create([
+            'name' => 'Alimentos naturales',
+            'slug' => 'alimentos-naturales-admin',
+        ]);
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Miel de Gabriel',
+            'slug' => 'miel-de-gabriel-admin',
+            'price_cents' => 120000,
+            'currency' => 'ARS',
+            'stock' => 4,
+            'unit' => 'frasco',
+            'status' => 'active',
+        ]);
+
+        Product::query()->create([
+            'producer_profile_id' => $otherProfile->id,
+            'category_id' => $category->id,
+            'name' => 'Yerba de otro productor',
+            'slug' => 'yerba-otro-productor-admin',
+            'price_cents' => 90000,
+            'currency' => 'ARS',
+            'stock' => 3,
+            'unit' => 'paquete',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/admin/products?search=raices')
+            ->assertOk()
+            ->assertJsonFragment(['business_name' => 'Finca Raices Verdes'])
+            ->assertJsonFragment(['name' => 'Gabriel Londero'])
+            ->assertJsonFragment(['email' => 'gabriel.londero@example.com'])
+            ->assertJsonFragment(['name' => 'Miel de Gabriel'])
+            ->assertJsonMissing(['name' => 'Yerba de otro productor']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson('/api/v1/admin/products?search=gabriel.londero@example.com')
+            ->assertOk()
+            ->assertJsonFragment(['name' => 'Miel de Gabriel']);
+
+        $this->actingAs($admin, 'sanctum')
+            ->getJson("/api/v1/admin/producers/{$profile->id}/products")
+            ->assertOk()
+            ->assertJsonFragment(['name' => $product->name])
+            ->assertJsonMissing(['name' => 'Yerba de otro productor']);
+    }
+
+    public function test_admin_product_moderation_note_notifies_seller_and_writes_audit_log(): void
+    {
+        Notification::fake();
+
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $seller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+
+        $profile = ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Productor Moderado',
+            'slug' => 'productor-moderado',
+            'status' => 'active',
+        ]);
+
+        $category = Category::query()->create([
+            'name' => 'Categoria moderacion',
+            'slug' => 'categoria-moderacion',
+        ]);
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Producto para revisar',
+            'slug' => 'producto-para-revisar',
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 5,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($admin, 'sanctum')
+            ->postJson("/api/v1/admin/products/{$product->id}/moderation-note", [
+                'status' => 'needs_changes',
+                'note' => 'Actualizar la foto principal y mejorar la descripcion.',
+                'notify_seller' => true,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'needs_changes')
+            ->assertJsonPath('data.visible_to_seller', true)
+            ->assertJsonPath('data.note', 'Actualizar la foto principal y mejorar la descripcion.');
+
+        Notification::assertSentTo($seller, \App\Notifications\ProductModerationNoteNotification::class);
+
+        $this->assertDatabaseHas('product_moderation_notes', [
+            'product_id' => $product->id,
+            'admin_id' => $admin->id,
+            'status' => 'needs_changes',
+        ]);
+
+        $this->assertDatabaseHas('admin_audit_logs', [
+            'admin_id' => $admin->id,
+            'action' => 'admin.product.moderation_note_created',
+            'subject_id' => $product->id,
+        ]);
+
+        $this->assertSame(1, ProductModerationNote::query()->count());
+        $this->assertSame(1, AdminAuditLog::query()->count());
+    }
+
+    public function test_conversation_summary_returns_latest_conversations_and_unread_count(): void
+    {
+        $buyer = User::factory()->create([
+            'role' => 'buyer',
+            'status' => 'active',
+        ]);
+
+        $seller = User::factory()->create([
+            'role' => 'seller',
+            'status' => 'active',
+        ]);
+
+        $profile = ProducerProfile::query()->create([
+            'user_id' => $seller->id,
+            'business_name' => 'Productor Chat',
+            'slug' => 'productor-chat-summary',
+            'status' => 'active',
+        ]);
+
+        $category = Category::query()->create([
+            'name' => 'Categoria chat',
+            'slug' => 'categoria-chat-summary',
+        ]);
+
+        $product = Product::query()->create([
+            'producer_profile_id' => $profile->id,
+            'category_id' => $category->id,
+            'name' => 'Producto chat',
+            'slug' => 'producto-chat-summary',
+            'price_cents' => 100000,
+            'currency' => 'ARS',
+            'stock' => 5,
+            'unit' => 'unidad',
+            'status' => 'active',
+        ]);
+
+        $conversation = Conversation::query()->create([
+            'buyer_id' => $buyer->id,
+            'producer_profile_id' => $profile->id,
+            'product_id' => $product->id,
+            'status' => 'open',
+            'last_message_at' => now(),
+        ]);
+
+        Message::query()->create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $seller->id,
+            'body' => 'Hola, tengo tu pedido listo.',
+            'read_at' => null,
+        ]);
+
+        Message::query()->create([
+            'conversation_id' => $conversation->id,
+            'sender_id' => $buyer->id,
+            'body' => 'Gracias.',
+            'read_at' => null,
+        ]);
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson('/api/v1/conversations/summary?limit=4')
+            ->assertOk()
+            ->assertJsonPath('data.unread_count', 1)
+            ->assertJsonPath('data.conversations.0.id', $conversation->id)
+            ->assertJsonPath('data.conversations.0.producer_profile.business_name', 'Productor Chat')
+            ->assertJsonPath('data.conversations.0.messages.0.body', 'Hola, tengo tu pedido listo.');
+
+        $this->actingAs($buyer, 'sanctum')
+            ->getJson("/api/v1/conversations/{$conversation->id}/messages")
+            ->assertOk();
+
+        $this->assertNotNull(Message::query()
+            ->where('conversation_id', $conversation->id)
+            ->where('sender_id', $seller->id)
+            ->firstOrFail()
+            ->read_at);
     }
 }

@@ -234,10 +234,13 @@ function SellerProductsView() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-soft">
-                {products.map((product) => (
+                {products.map((product) => {
+                  const latestNote = moderationNotesOf(product)[0];
+
+                  return (
                   <tr key={product.id} className="hover:bg-cream-card/50 transition">
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3">
                         {product.images?.[0] ? (
                           <img
                             src={imageUrl(product.images[0].path)}
@@ -249,12 +252,20 @@ function SellerProductsView() {
                             <BagIcon className="h-4 w-4" />
                           </span>
                         )}
-                        <Link
-                          href={`/products/${product.slug}`}
-                          className="font-semibold text-stone-800 transition hover:text-olive"
-                        >
-                          {product.name}
-                        </Link>
+                        <div className="min-w-0">
+                          <Link
+                            href={`/products/${product.slug}`}
+                            className="font-semibold text-stone-800 transition hover:text-olive"
+                          >
+                            {product.name}
+                          </Link>
+                          {latestNote && (
+                            <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                              <p className="font-semibold">Observación de administración</p>
+                              <p className="mt-1 line-clamp-2">{latestNote.note}</p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-5 py-4 text-stone-600">{product.category?.name ?? "—"}</td>
@@ -326,7 +337,8 @@ function SellerProductsView() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -334,4 +346,8 @@ function SellerProductsView() {
       )}
     </div>
   );
+}
+
+function moderationNotesOf(product: Product) {
+  return product.moderation_notes ?? product.moderationNotes ?? [];
 }

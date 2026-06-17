@@ -25,6 +25,7 @@ export type ProducerProfile = {
   logo_path?: string | null;
   products_count?: number;
   products?: Product[];
+  user?: { id: number; name: string; email?: string };
   social_links?: ProducerSocialLink[];
   socialLinks?: ProducerSocialLink[];
 };
@@ -66,6 +67,20 @@ export type Product = {
   producer_profile?: ProducerProfile;
   producerProfile?: ProducerProfile;
   images?: ProductImage[];
+  moderation_notes?: ProductModerationNote[];
+  moderationNotes?: ProductModerationNote[];
+};
+
+export type ProductModerationNote = {
+  id: number;
+  product_id: number;
+  admin_id?: number | null;
+  status: string;
+  note: string;
+  visible_to_seller: boolean;
+  notified_at?: string | null;
+  created_at?: string;
+  admin?: { id: number; name: string; email?: string };
 };
 
 export type CatalogProvinceFilter = {
@@ -150,6 +165,12 @@ export type Conversation = {
   order?: Order;
   producer_profile?: ProducerProfile;
   messages?: Message[];
+  unread_count?: number;
+};
+
+export type ConversationSummary = {
+  unread_count: number;
+  conversations: Conversation[];
 };
 
 export type Message = {
@@ -774,6 +795,14 @@ export async function getConversations(): Promise<Conversation[]> {
   }
 }
 
+export async function getConversationSummary(limit = 4): Promise<ConversationSummary> {
+  try {
+    return await apiAuthGet<ConversationSummary>(`/conversations/summary?limit=${limit}`);
+  } catch {
+    return { unread_count: 0, conversations: [] };
+  }
+}
+
 export async function createConversation(data: {
   producer_profile_id: number;
   product_id?: number;
@@ -848,12 +877,50 @@ export async function updateAdminUserStatus(id: number, status: string): Promise
   return apiAuthPatch<AdminUser>(`/admin/users/${id}/status`, { status });
 }
 
-export async function getAdminProducts(): Promise<Product[]> {
+export async function getAdminProducts(params?: {
+  search?: string;
+  status?: string;
+  producer_id?: number;
+}): Promise<Product[]> {
   try {
-    return await apiAuthGet<Product[]>("/admin/products");
+    const search = new URLSearchParams();
+    if (params?.search) search.set("search", params.search);
+    if (params?.status && params.status !== "all") search.set("status", params.status);
+    if (params?.producer_id) search.set("producer_id", String(params.producer_id));
+    const query = search.toString();
+    return await apiAuthGet<Product[]>(`/admin/products${query ? `?${query}` : ""}`);
   } catch {
     return [];
   }
+}
+
+export async function getAdminProducerProducts(id: number): Promise<Product[]> {
+  try {
+    return await apiAuthGet<Product[]>(`/admin/producers/${id}/products`);
+  } catch {
+    return [];
+  }
+}
+
+export async function updateAdminProduct(id: number, data: Record<string, unknown>): Promise<Product> {
+  return apiAuthPatch<Product>(`/admin/products/${id}`, data);
+}
+
+export type AdminProductDeleteResult = {
+  action: "deleted" | "paused";
+  message: string;
+  product?: Product;
+};
+
+export async function deleteAdminProduct(id: number): Promise<AdminProductDeleteResult> {
+  return apiAuthDelete<AdminProductDeleteResult>(`/admin/products/${id}`);
+}
+
+export async function createAdminProductModerationNote(
+  id: number,
+  data: { note: string; status?: string; notify_seller?: boolean },
+): Promise<ProductModerationNote> {
+  return apiAuthPost<ProductModerationNote>(`/admin/products/${id}/moderation-note`, data);
 }
 
 export async function approveAdminProduct(id: number): Promise<Product> {

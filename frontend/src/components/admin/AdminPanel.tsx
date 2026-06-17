@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { ProducerReview } from "@/components/admin/ProducerReview";
@@ -21,7 +21,15 @@ const tabs: { id: Tab; label: string }[] = [
 
 export function AdminPanel() {
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>("users");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab") as Tab | null;
+  const tab: Tab =
+    requestedTab && tabs.some((item) => item.id === requestedTab)
+      ? requestedTab
+      : searchParams.get("producer_id")
+        ? "products"
+        : "users";
 
   return (
     <div className="grid gap-6">
@@ -39,7 +47,7 @@ export function AdminPanel() {
           <button
             key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => router.replace(`/admin?tab=${t.id}`, { scroll: false })}
             className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition ${
               tab === t.id
                 ? "border-olive text-olive-dark"

@@ -157,7 +157,14 @@ class SellerController extends Controller
         $profile = $this->profileOrFail($request);
 
         return response()->json([
-            'data' => $profile->products()->with(['category', 'images'])->latest()->get(),
+            'data' => $profile->products()
+                ->with([
+                    'category',
+                    'images',
+                    'moderationNotes' => fn ($query) => $query->where('visible_to_seller', true)->latest(),
+                ])
+                ->latest()
+                ->get(),
         ]);
     }
 
@@ -183,7 +190,13 @@ class SellerController extends Controller
         $profile = $this->profileOrFail($request);
 
         return response()->json([
-            'data' => $profile->products()->with(['category', 'images'])->findOrFail($id),
+            'data' => $profile->products()
+                ->with([
+                    'category',
+                    'images',
+                    'moderationNotes' => fn ($query) => $query->where('visible_to_seller', true)->latest(),
+                ])
+                ->findOrFail($id),
         ]);
     }
 

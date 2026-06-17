@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
-import { BagIcon, ChevronDownIcon, HeartIcon, MessageIcon, SearchIcon } from "@/components/ui/Icons";
+import { CartIcon, ChevronDownIcon, HeartIcon, MessageIcon, SearchIcon } from "@/components/ui/Icons";
 import { useAuth } from "@/components/AuthProvider";
 import { useFavorites } from "@/components/FavoritesProvider";
-import { getCart, getConversations } from "@/lib/api";
+import type { Cart, Conversation } from "@/lib/api";
+import { getCart, getConversationSummary, money } from "@/lib/api";
 
 type NavItem = { label: string; href: string };
 
@@ -29,8 +30,12 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const { user, ready, logout } = useAuth();
   const { favoriteCount } = useFavorites();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [openPanel, setOpenPanel] = useState<"messages" | "cart" | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
+  const [cart, setCart] = useState<Cart | null>(null);
+  const [messagePreview, setMessagePreview] = useState<Conversation[]>([]);
+  const panelsRef = useRef<HTMLDivElement>(null);
 
   const transparent = variant === "transparent";
   const showNav = variant !== "minimal";
@@ -49,6 +54,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setMenuOpen(false);
+    setOpenPanel(null);
   }, [pathname]);
 
   useEffect(() => {
@@ -59,11 +65,13 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
     let cancelled = false;
 
     async function loadCounts() {
-      const [cart, conversations] = await Promise.all([getCart(), getConversations()]);
+      const [cartData, conversationSummary] = await Promise.all([getCart(), getConversationSummary(4)]);
       if (cancelled) return;
-      const nextCartCount = cart.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+      const nextCartCount = cartData.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+      setCart(cartData);
       setCartCount(nextCartCount);
-      setMessageCount(conversations.length);
+      setMessageCount(conversationSummary.unread_count);
+      setMessagePreview(conversationSummary.conversations);
     }
 
     void loadCounts();
@@ -72,6 +80,30 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
       cancelled = true;
     };
   }, [ready, user]);
+
+  useEffect(() => {
+    if (!openPanel) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      if (panelsRef.current && !panelsRef.current.contains(event.target as Node)) {
+        setOpenPanel(null);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpenPanel(null);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [openPanel]);
 
   async function handleLogout() {
     setMenuOpen(false);
@@ -110,22 +142,46 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           </nav>
         )}
 
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div ref={panelsRef} className="relative flex items-center gap-1 sm:gap-2">
           <IconButton transparent={transparent} ariaLabel="Buscar" href="/buscar">
             <SearchIcon className="h-5 w-5" />
           </IconButton>
           {/* Secondary icons collapse into the mobile menu on small screens. */}
           <span className="hidden items-center gap-1 sm:flex sm:gap-2">
-            <IconButton transparent={transparent} ariaLabel="Mensajes" href="/chat" badge={user && messageCount > 0 ? messageCount : undefined}>
+            <HeaderIconButton
+              transparent={transparent}
+              ariaLabel="Mensajes"
+              badge={user && messageCount > 0 ? messageCount : undefined}
+              expanded={openPanel === "messages"}
+              onClick={() => setOpenPanel((current) => (current === "messages" ? null : "messages"))}
+            >
               <MessageIcon className="h-5 w-5" />
-            </IconButton>
+            </HeaderIconButton>
             <IconButton transparent={transparent} ariaLabel="Favoritos" href="/favoritos" badge={user && favoriteCount > 0 ? favoriteCount : undefined}>
               <HeartIcon className="h-5 w-5" />
             </IconButton>
           </span>
-          <IconButton transparent={transparent} ariaLabel="Carrito" href="/cart" badge={user && cartCount > 0 ? cartCount : undefined}>
-            <BagIcon className="h-5 w-5" />
-          </IconButton>
+          <HeaderIconButton
+            transparent={transparent}
+            ariaLabel="Carrito"
+            badge={user && cartCount > 0 ? cartCount : undefined}
+            expanded={openPanel === "cart"}
+            onClick={() => setOpenPanel((current) => (current === "cart" ? null : "cart"))}
+          >
+            <CartIcon className="h-5 w-5" />
+          </HeaderIconButton>
+
+          {ready && user && openPanel === "messages" && (
+            <MessagesPreviewPanel
+              conversations={messagePreview}
+              userRole={user.role}
+              onNavigate={() => setOpenPanel(null)}
+            />
+          )}
+
+          {ready && user && openPanel === "cart" && (
+            <CartPreviewPanel cart={cart} onNavigate={() => setOpenPanel(null)} />
+          )}
 
           <div className="ml-1 hidden h-8 w-px bg-current opacity-20 lg:block" />
 
@@ -323,6 +379,188 @@ function IconButton({
       ) : null}
     </Link>
   );
+}
+
+function HeaderIconButton({
+  children,
+  ariaLabel,
+  badge,
+  transparent,
+  expanded,
+  onClick,
+}: {
+  children: React.ReactNode;
+  ariaLabel: string;
+  badge?: number;
+  transparent?: boolean;
+  expanded?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={ariaLabel}
+      aria-expanded={expanded}
+      className={`relative inline-flex h-10 w-10 items-center justify-center rounded-full transition ${
+        transparent ? "text-white hover:bg-white/10" : "text-brown-icon hover:bg-olive-muted hover:text-brown"
+      }`}
+    >
+      {children}
+      {badge ? (
+        <span className="absolute -right-0.5 -top-0.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-olive px-1 text-[10px] font-bold leading-none text-white">
+          {badge}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function MessagesPreviewPanel({
+  conversations,
+  userRole,
+  onNavigate,
+}: {
+  conversations: Conversation[];
+  userRole: string;
+  onNavigate: () => void;
+}) {
+  return (
+    <div className="absolute right-0 top-full z-50 mt-3 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border-soft bg-white text-foreground shadow-xl">
+      <div className="border-b border-border-soft bg-cream-card px-4 py-3">
+        <p className="text-sm font-semibold text-stone-900">Mensajes recientes</p>
+        <p className="text-xs text-stone-500">Últimas conversaciones de Mercado Ahora</p>
+      </div>
+      {conversations.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-stone-500">No tenés mensajes recientes.</div>
+      ) : (
+        <div className="max-h-80 overflow-y-auto">
+          {conversations.map((conversation) => {
+            const name = conversationPreviewName(conversation, userRole);
+            const initials = initialsFor(name);
+            const lastMessage = conversation.messages?.[0]?.body ?? "Sin mensajes todavía";
+
+            return (
+              <Link
+                key={conversation.id}
+                href={`/chat?id=${conversation.id}`}
+                onClick={onNavigate}
+                className="grid grid-cols-[2.5rem_1fr_auto] gap-3 border-b border-border-soft px-4 py-3 text-left transition last:border-b-0 hover:bg-olive-muted"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-olive-muted text-xs font-bold text-olive-dark">
+                  {initials}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold text-stone-900">{name}</span>
+                  <span className="block truncate text-xs text-stone-500">{lastMessage}</span>
+                </span>
+                <span className="whitespace-nowrap text-[11px] text-stone-400">
+                  {relativeTime(conversation.last_message_at)}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+      <Link
+        href="/chat"
+        onClick={onNavigate}
+        className="block border-t border-border-soft px-4 py-3 text-center text-sm font-semibold text-olive-dark transition hover:bg-cream-card"
+      >
+        Ver todos los mensajes
+      </Link>
+    </div>
+  );
+}
+
+function CartPreviewPanel({ cart, onNavigate }: { cart: Cart | null; onNavigate: () => void }) {
+  const items = cart?.items ?? [];
+  const subtotal = items.reduce(
+    (sum, item) => sum + item.unit_price_cents_snapshot * item.quantity,
+    0,
+  );
+
+  return (
+    <div className="absolute right-0 top-full z-50 mt-3 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border-soft bg-white text-foreground shadow-xl">
+      <div className="border-b border-border-soft bg-cream-card px-4 py-3">
+        <p className="text-sm font-semibold text-stone-900">Tu carrito</p>
+        <p className="text-xs text-stone-500">
+          {items.length > 0 ? `${items.length} producto${items.length !== 1 ? "s" : ""} seleccionado${items.length !== 1 ? "s" : ""}` : "Sin productos seleccionados"}
+        </p>
+      </div>
+      {items.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-stone-500">Todavía no agregaste productos.</div>
+      ) : (
+        <>
+          <div className="max-h-80 overflow-y-auto">
+            {items.map((item) => (
+              <div key={item.id} className="grid grid-cols-[1fr_auto] gap-3 border-b border-border-soft px-4 py-3 last:border-b-0">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-stone-900">{item.product_name_snapshot}</p>
+                  <p className="text-xs text-stone-500">
+                    {item.quantity} x {money(item.unit_price_cents_snapshot)}
+                  </p>
+                </div>
+                <p className="text-sm font-semibold text-olive-dark">
+                  {money(item.unit_price_cents_snapshot * item.quantity)}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="flex items-center justify-between border-t border-border-soft px-4 py-3">
+            <span className="text-sm font-semibold text-stone-700">Subtotal</span>
+            <span className="text-base font-bold text-stone-900">{money(subtotal)}</span>
+          </div>
+        </>
+      )}
+      <div className="grid gap-2 border-t border-border-soft bg-cream-card p-3 sm:grid-cols-2">
+        <Link
+          href="/cart"
+          onClick={onNavigate}
+          className="rounded-full border border-olive px-4 py-2 text-center text-sm font-semibold text-olive-dark transition hover:bg-white"
+        >
+          Ver carrito
+        </Link>
+        <Link
+          href="/checkout"
+          onClick={onNavigate}
+          className="rounded-full bg-olive px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-olive-dark"
+        >
+          Finalizar compra
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function conversationPreviewName(conversation: Conversation, userRole: string): string {
+  if (userRole === "seller") {
+    return (conversation as Conversation & { buyer?: { name?: string } }).buyer?.name ?? "Comprador";
+  }
+
+  return conversation.producer_profile?.business_name ?? "Productor";
+}
+
+function initialsFor(name: string): string {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "MA";
+}
+
+function relativeTime(value?: string): string {
+  if (!value) return "";
+  const diffMs = Date.now() - new Date(value).getTime();
+  const diffMinutes = Math.max(0, Math.round(diffMs / 60000));
+  if (diffMinutes < 1) return "recién";
+  if (diffMinutes < 60) return `hace ${diffMinutes} min`;
+  const diffHours = Math.round(diffMinutes / 60);
+  if (diffHours < 24) return `hace ${diffHours} h`;
+  if (diffHours < 48) return "ayer";
+  return new Date(value).toLocaleDateString("es-AR", { day: "numeric", month: "short" });
 }
 
 function UserMenu({

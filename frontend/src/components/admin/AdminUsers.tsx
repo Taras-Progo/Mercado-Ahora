@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import type { AdminUser } from "@/lib/api";
 import { getAdminUsers, resetAdminUserPassword, statusLabel, updateAdminUserStatus } from "@/lib/api";
 import { CheckCircleIcon, SearchIcon, ShieldCheckIcon, UsersIcon, XCircleIcon } from "@/components/ui/Icons";
@@ -232,7 +233,21 @@ export function AdminUsers() {
                       </div>
                     </td>
                     <td className="px-5 py-4 text-stone-600">
-                      {profile?.business_name ? `${profile.business_name} (${statusLabel(profile.status)})` : "-"}
+                      {profile?.business_name ? (
+                        <div className="grid gap-1">
+                          <span className="font-semibold text-stone-800">
+                            {profile.business_name} ({statusLabel(profile.status)})
+                          </span>
+                          <Link
+                            href={`/admin?tab=products&producer_id=${profile.id}`}
+                            className="text-xs font-semibold text-olive-dark underline-offset-2 hover:underline"
+                          >
+                            Ver publicaciones
+                          </Link>
+                        </div>
+                      ) : (
+                        "-"
+                      )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <button

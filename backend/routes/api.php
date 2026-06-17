@@ -67,6 +67,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/orders/{id}/payment', [OrderController::class, 'paymentStatus']);
 
             Route::get('/conversations', [ChatController::class, 'index']);
+            Route::get('/conversations/summary', [ChatController::class, 'summary']);
             Route::post('/conversations', [ChatController::class, 'store']);
             Route::get('/conversations/{id}', [ChatController::class, 'show']);
             Route::get('/conversations/{id}/messages', [ChatController::class, 'messages']);
@@ -109,19 +110,25 @@ Route::prefix('v1')->group(function () {
             Route::patch('/admin/users/{id}/status', [AdminController::class, 'updateUserStatus']);
             Route::patch('/admin/users/{id}/password', [AdminController::class, 'resetUserPassword']);
             Route::get('/admin/producers', [AdminController::class, 'producers']);
+            Route::get('/admin/producers/{id}/products', [AdminController::class, 'producerProducts']);
+            Route::get('/admin/producers/{id}/support-view', [AdminController::class, 'supportProducer']);
             Route::patch('/admin/producers/{id}/status', [AdminController::class, 'updateProducerStatus']);
             Route::patch('/admin/producers/{id}/approve', [AdminController::class, 'approveProducer']);
             Route::patch('/admin/producers/{id}/reject', [AdminController::class, 'rejectProducer']);
             Route::get('/admin/products', [AdminController::class, 'products']);
+            Route::patch('/admin/products/{id}', [AdminController::class, 'updateProduct']);
+            Route::delete('/admin/products/{id}', [AdminController::class, 'deleteProduct']);
             Route::patch('/admin/products/{id}/approve', [AdminController::class, 'approveProduct']);
             Route::patch('/admin/products/{id}/reject', [AdminController::class, 'rejectProduct']);
             Route::patch('/admin/products/{id}/status', [AdminController::class, 'updateProductStatus']);
             Route::patch('/admin/products/{id}/ecoscore', [AdminController::class, 'validateEcoScore']);
+            Route::post('/admin/products/{id}/moderation-note', [AdminController::class, 'addProductModerationNote']);
             Route::get('/admin/orders', [AdminController::class, 'orders']);
             Route::get('/admin/orders/{id}', [AdminController::class, 'order']);
             Route::patch('/admin/orders/{id}/status', [AdminController::class, 'updateOrderStatus']);
             Route::get('/admin/returns', [AdminController::class, 'returns']);
             Route::patch('/admin/returns/{id}/status', [AdminController::class, 'updateReturnStatus']);
+            Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs']);
         });
     });
 });

@@ -40,4 +40,9 @@ class Product extends Model
     {
         return $this->belongsToMany(User::class, 'product_favorites')->withTimestamps();
     }
+
+    public function moderationNotes(): HasMany
+    {
+        return $this->hasMany(ProductModerationNote::class);
+    }
 }

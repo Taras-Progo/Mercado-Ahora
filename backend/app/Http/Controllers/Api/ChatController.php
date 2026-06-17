@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
+use App\Models\Message;
 use App\Models\ProducerProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,47 @@ class ChatController extends Controller
             ->get();
 
         return response()->json(['data' => $conversations]);
+    }
+
+    public function summary(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $baseQuery = Conversation::query()
+            ->where('buyer_id', $user->id)
+            ->orWhereHas('producerProfile', fn ($query) => $query->where('user_id', $user->id));
+
+        $conversationIds = (clone $baseQuery)->pluck('id');
+
+        $unreadCount = Message::query()
+            ->whereIn('conversation_id', $conversationIds)
+            ->where('sender_id', '!=', $user->id)
+            ->whereNull('read_at')
+            ->count();
+
+        $conversations = (clone $baseQuery)
+            ->with([
+                'buyer',
+                'producerProfile.user',
+                'product',
+                'order',
+                'messages' => fn ($query) => $query->latest()->limit(1),
+            ])
+            ->withCount([
+                'messages as unread_count' => fn ($query) => $query
+                    ->where('sender_id', '!=', $user->id)
+                    ->whereNull('read_at'),
+            ])
+            ->latest('last_message_at')
+            ->limit((int) $request->query('limit', 4))
+            ->get();
+
+        return response()->json([
+            'data' => [
+                'unread_count' => $unreadCount,
+                'conversations' => $conversations,
+            ],
+        ]);
     }
 
     public function store(Request $request): JsonResponse
@@ -68,6 +110,10 @@ class ChatController extends Controller
     public function messages(Request $request, int $id): JsonResponse
     {
         $conversation = $this->conversationForUser($request, $id);
+        $conversation->messages()
+            ->where('sender_id', '!=', $request->user()->id)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
 
         return response()->json(['data' => $conversation->messages()->with('sender')->oldest()->get()]);
     }
