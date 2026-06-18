@@ -8,7 +8,7 @@ import { CartIcon, ChevronDownIcon, HeartIcon, MessageIcon, SearchIcon } from "@
 import { useAuth } from "@/components/AuthProvider";
 import { useFavorites } from "@/components/FavoritesProvider";
 import type { Cart, Conversation } from "@/lib/api";
-import { getCart, getConversationSummary, money } from "@/lib/api";
+import { ApiError, getCart, getConversationSummary, money } from "@/lib/api";
 
 type NavItem = { label: string; href: string };
 
@@ -65,13 +65,22 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
     let cancelled = false;
 
     async function loadCounts() {
-      const [cartData, conversationSummary] = await Promise.all([getCart(), getConversationSummary(4)]);
-      if (cancelled) return;
-      const nextCartCount = cartData.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
-      setCart(cartData);
-      setCartCount(nextCartCount);
-      setMessageCount(conversationSummary.unread_count);
-      setMessagePreview(conversationSummary.conversations);
+      try {
+        const [cartData, conversationSummary] = await Promise.all([getCart(), getConversationSummary(4)]);
+        if (cancelled) return;
+        const nextCartCount = cartData.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+        setCart(cartData);
+        setCartCount(nextCartCount);
+        setMessageCount(conversationSummary.unread_count);
+        setMessagePreview(conversationSummary.conversations);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          await logout();
+        }
+        if (cancelled) return;
+        setCart(null);
+        setCartCount(0);
+      }
     }
 
     void loadCounts();
@@ -79,7 +88,7 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
     return () => {
       cancelled = true;
     };
-  }, [ready, user]);
+  }, [logout, ready, user]);
 
   useEffect(() => {
     if (!openPanel) return;

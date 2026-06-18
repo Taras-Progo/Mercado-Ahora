@@ -36,7 +36,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/search/producers', [CatalogController::class, 'producers']);
     Route::post('/payments/webhooks/{provider}', [PaymentWebhookController::class, 'store']);
 
-    Route::middleware('auth:sanctum')->group(function () {
+    Route::middleware(['auth:sanctum', 'no-store'])->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout']);
         Route::get('/auth/me', [AuthController::class, 'me']);
         Route::post('/auth/email/verify', [AuthController::class, 'sendEmailVerification']);

@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { currentPathWithSearch, loginRedirectUrl, useAuth } from "@/components/AuthProvider";
 import type { Cart } from "@/lib/api";
-import { getCart, removeCartItem, updateCartItem, money, imageUrl } from "@/lib/api";
+import { ApiError, getCart, removeCartItem, updateCartItem, money, imageUrl } from "@/lib/api";
 import { TrashIcon, MinusIcon, PlusIcon, BagIcon } from "@/components/ui/Icons";
 
 export default function CartPage() {
@@ -20,26 +21,59 @@ export default function CartPage() {
 
 function CartContent() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updatingItems, setUpdatingItems] = useState<Set<number>>(new Set());
 
-  const fetchCart = useCallback(async () => {
+  const handleAuthError = useCallback(async (err: unknown) => {
+    if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+      await logout();
+      router.replace(loginRedirectUrl(currentPathWithSearch()));
+      return true;
+    }
+
+    return false;
+  }, [logout, router]);
+
+  const fetchCart = useCallback(async (options?: { clearError?: boolean; showLoading?: boolean }) => {
+    if (options?.showLoading) setLoading(true);
     try {
       const data = await getCart();
       setCart(data);
-      setError("");
+      if (options?.clearError !== false) setError("");
     } catch (err) {
+      if (await handleAuthError(err)) return;
       setError(err instanceof Error ? err.message : "Error al cargar el carrito.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [handleAuthError]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    fetchCart();
+    fetchCart({ showLoading: true });
+  }, [fetchCart]);
+
+  useEffect(() => {
+    const refreshVisibleCart = () => {
+      if (document.visibilityState === "visible") {
+        void fetchCart({ clearError: false });
+      }
+    };
+
+    const refreshFocusedCart = () => {
+      void fetchCart({ clearError: false });
+    };
+
+    document.addEventListener("visibilitychange", refreshVisibleCart);
+    window.addEventListener("focus", refreshFocusedCart);
+
+    return () => {
+      document.removeEventListener("visibilitychange", refreshVisibleCart);
+      window.removeEventListener("focus", refreshFocusedCart);
+    };
   }, [fetchCart]);
 
   const handleUpdateQuantity = async (itemId: number, newQty: number) => {
@@ -50,7 +84,9 @@ function CartContent() {
       const updated = await updateCartItem(itemId, newQty);
       setCart(updated);
     } catch (err) {
+      if (await handleAuthError(err)) return;
       setError(err instanceof Error ? err.message : "Error al actualizar cantidad.");
+      await fetchCart({ clearError: false });
     } finally {
       setUpdatingItems((prev) => {
         const next = new Set(prev);
@@ -66,7 +102,10 @@ function CartContent() {
       const updated = await removeCartItem(itemId);
       setCart(updated);
     } catch (err) {
+      if (await handleAuthError(err)) return;
       setError(err instanceof Error ? err.message : "Error al remover producto.");
+    } finally {
+      await fetchCart({ clearError: false });
     }
   };
 
@@ -100,8 +139,15 @@ function CartContent() {
           </h1>
 
           {error && (
-            <div className="mb-4 rounded-full bg-red-50 px-4 py-2 text-sm text-center text-red-700">
-              {error}
+            <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-center sm:text-left">{error}</span>
+              <button
+                type="button"
+                onClick={() => fetchCart({ clearError: true, showLoading: true })}
+                className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+              >
+                Actualizar carrito
+              </button>
             </div>
           )}
 
@@ -123,7 +169,7 @@ function CartContent() {
                 {items.map((item) => {
                   const product = item.product;
                   const price = item.unit_price_cents_snapshot ?? 0;
-                  const primaryImage = product?.images?.find((img) => img.is_primary);
+                  const primaryImage = product?.images?.find((img) => img.is_primary) ?? product?.images?.[0];
                   return (
                     <li key={item.id} className="flex gap-4 p-4 sm:p-5">
                       {/* Image */}

@@ -194,6 +194,13 @@ export class ApiError extends Error {
   }
 }
 
+type ApiErrorPayload = {
+  message?: string;
+  data?: { message?: string };
+  errors?: Record<string, unknown>;
+  conflicts?: CheckoutConflict[];
+};
+
 const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api/v1";
 const INTERNAL_API_BASE =
   process.env.INTERNAL_API_BASE_URL ??
@@ -489,12 +496,31 @@ async function apiAuthDelete<T>(path: string): Promise<T> {
 }
 
 async function parseApiError(response: Response): Promise<ApiError> {
-  const payload = await response.json().catch(() => ({ message: "Error de red" }));
-  const message =
+  const payload = (await response.json().catch(() => ({ message: "Error de red" }))) as ApiErrorPayload;
+  const message = normalizeApiMessage(payload, response.status);
+  return new ApiError(message, response.status, payload);
+}
+
+function normalizeApiMessage(payload: ApiErrorPayload, status: number): string {
+  const rawMessage =
     (typeof payload?.message === "string" && payload.message) ||
     (typeof payload?.data?.message === "string" && payload.data.message) ||
-    "Error de red";
-  return new ApiError(message, response.status, payload);
+    "";
+
+  if (status === 401 || ["Unauthenticated", "Unauthenticated.", "Unauthorized"].includes(rawMessage)) {
+    return "No pudimos validar tu sesión. Iniciá sesión nuevamente.";
+  }
+
+  if (status === 403 || rawMessage === "Forbidden") {
+    return "No tenés permiso para realizar esta acción.";
+  }
+
+  if (payload?.errors && typeof payload.errors === "object") {
+    const messages = Object.values(payload.errors).flat().filter(Boolean);
+    if (messages.length > 0) return String(messages[0]);
+  }
+
+  return rawMessage || "Error de red";
 }
 
 // ---- Favorites API ----
@@ -605,11 +631,7 @@ export function imageUrl(path: string): string {
 // ---- Cart API ----
 
 export async function getCart(): Promise<Cart> {
-  try {
-    return await apiAuthGet<Cart>("/cart");
-  } catch {
-    return { id: 0, user_id: 0, items: [] };
-  }
+  return apiAuthGet<Cart>("/cart");
 }
 
 export async function addToCart(productId: number, quantity?: number): Promise<Cart> {
