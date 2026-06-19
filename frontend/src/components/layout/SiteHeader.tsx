@@ -155,17 +155,19 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
           <IconButton transparent={transparent} ariaLabel="Buscar" href="/buscar">
             <SearchIcon className="h-5 w-5" />
           </IconButton>
-          {/* Secondary icons collapse into the mobile menu on small screens. */}
-          <span className="hidden items-center gap-1 sm:flex sm:gap-2">
+          {ready && user ? (
             <HeaderIconButton
               transparent={transparent}
               ariaLabel="Mensajes"
-              badge={user && messageCount > 0 ? messageCount : undefined}
+              badge={messageCount > 0 ? messageCount : undefined}
               expanded={openPanel === "messages"}
               onClick={() => setOpenPanel((current) => (current === "messages" ? null : "messages"))}
             >
               <MessageIcon className="h-5 w-5" />
             </HeaderIconButton>
+          ) : null}
+          {/* Favorites stays secondary on very small screens; messages and cart remain one tap away. */}
+          <span className="hidden items-center gap-1 sm:flex sm:gap-2">
             <IconButton transparent={transparent} ariaLabel="Favoritos" href="/favoritos" badge={user && favoriteCount > 0 ? favoriteCount : undefined}>
               <HeartIcon className="h-5 w-5" />
             </IconButton>
