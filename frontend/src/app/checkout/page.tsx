@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
@@ -9,6 +9,7 @@ import type { Cart, CheckoutConflict, Order } from "@/lib/api";
 import {
   ApiError,
   checkoutCart,
+  checkoutWithMercadoPago,
   getCart,
   imageUrl,
   money,
@@ -41,6 +42,8 @@ function CheckoutContent() {
   const [city, setCity] = useState("");
   const [province, setProvince] = useState("");
   const [buyerNote, setBuyerNote] = useState("");
+  const paymentInFlight = useRef(false);
+  const paymentAttemptKey = useRef<string | null>(null);
 
   const fetchCart = useCallback(async () => {
     try {
@@ -154,6 +157,53 @@ function CheckoutContent() {
     [removeItem, updateQuantity],
   );
 
+
+  const handleMercadoPagoCheckout = async () => {
+    if (paymentInFlight.current) return;
+
+    paymentInFlight.current = true;
+    setSubmitting(true);
+    setError("");
+
+    try {
+      const freshCart = await refreshCartState();
+      const freshItems = freshCart?.items ?? [];
+
+      if (freshItems.length === 0) {
+        setError("Tu carrito está vacío. Agregá productos antes de iniciar el pago.");
+        paymentInFlight.current = false;
+        paymentAttemptKey.current = null;
+        setSubmitting(false);
+        return;
+      }
+
+      const response = await checkoutWithMercadoPago({
+        idempotency_key: paymentAttemptKey.current ?? (paymentAttemptKey.current = window.crypto.randomUUID()),
+        delivery_type: deliveryType || undefined,
+        delivery_address: deliveryAddress || undefined,
+        city: city || undefined,
+        province: province || undefined,
+        buyer_note: buyerNote || undefined,
+      });
+
+      if (!response.checkout_url) {
+        throw new Error("Mercado Pago no devolvió una dirección de pago válida.");
+      }
+
+      window.location.assign(response.checkout_url);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const payload = err.payload as { conflicts?: CheckoutConflict[] } | undefined;
+        const nextConflicts = Array.isArray(payload?.conflicts) ? payload.conflicts : [];
+        setConflicts(nextConflicts);
+      }
+      setError(err instanceof Error ? err.message : "No pudimos iniciar el pago con Mercado Pago.");
+      paymentInFlight.current = false;
+      paymentAttemptKey.current = null;
+      setSubmitting(false);
+    }
+  };
+
   const handleCheckout = async () => {
     setSubmitting(true);
     setError("");
@@ -163,7 +213,7 @@ function CheckoutContent() {
       const items = freshCart?.items ?? [];
 
       if (items.length === 0) {
-        setError("Tu carrito está vacío. Agrega productos antes de confirmar el pedido.");
+        setError("Tu carrito está vacío. Agregá productos antes de confirmar el pedido.");
         return;
       }
 
@@ -331,7 +381,7 @@ function CheckoutContent() {
             <div className="mt-12 text-center">
               <BagIcon className="mx-auto h-12 w-12 text-stone-300" />
               <p className="mt-4 text-sm text-stone-500">
-                Tu carrito está vacío. Agrega productos antes de confirmar el pedido.
+                Tu carrito está vacío. Agregá productos antes de confirmar el pedido.
               </p>
               <Link
                 href="/categorias"
@@ -483,7 +533,7 @@ function CheckoutContent() {
                     <span className="font-bold text-olive">{money(subtotal)}</span>
                   </div>
                   <p className="mt-3 text-xs leading-5 text-stone-500">
-                    La compra crea un pedido pendiente y luego comprador y productor coordinan pago y entrega manualmente.
+                    Podés pagar online con Mercado Pago o conservar la coordinación manual con el productor.
                   </p>
                 </section>
 
@@ -557,19 +607,30 @@ function CheckoutContent() {
                     </label>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleCheckout}
-                    disabled={submitting || items.length === 0 || conflicts.length > 0}
-                    className="mt-5 w-full rounded-full bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-dark disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {submitting ? "Procesando pedido..." : "Confirmar pedido"}
-                  </button>
-                  <p className="mt-2 text-center text-xs text-stone-400">
+                  <div className="mt-5 space-y-3">
+                    <button
+                      type="button"
+                      onClick={handleMercadoPagoCheckout}
+                      disabled={submitting || items.length === 0 || conflicts.length > 0}
+                      className="w-full rounded-full bg-olive px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-olive-dark disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {submitting ? "Preparando Mercado Pago..." : "Pagar con Mercado Pago"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCheckout}
+                      disabled={submitting || items.length === 0 || conflicts.length > 0}
+                      className="w-full rounded-full border border-olive px-6 py-3 text-sm font-semibold text-olive transition hover:bg-olive/5 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      Confirmar pedido con pago manual
+                    </button>
+                  </div>
+                  <p className="mt-3 text-center text-xs leading-5 text-stone-500">
                     {conflicts.length > 0
-                      ? "Resuelve los productos marcados para continuar."
-                      : "Si compras a varios productores, se generarán pedidos separados."}
+                      ? "Resolvé los productos marcados para continuar."
+                      : "Mercado Pago reserva el stock durante 30 minutos. Si comprás a varios productores, se generan pedidos separados dentro del mismo pago."}
                   </p>
+
                 </section>
               </aside>
             </div>

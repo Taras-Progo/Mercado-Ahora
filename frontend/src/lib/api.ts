@@ -221,12 +221,12 @@ function apiUrl(path: string): string {
 
 export const demoCategories: Category[] = [
   { id: 1, name: "Alimentos naturales", slug: "alimentos-naturales", description: "Miel, mermeladas, conservas, frutos secos, granos" },
-  { id: 2, name: "Huerta y productos frescos", slug: "huerta-y-productos-frescos", description: "Frutas, verduras, huevos, plantas aromáticas" },
-  { id: 3, name: "Bebidas naturales", slug: "bebidas-naturales", description: "Tés, infusiones, jugos naturales" },
-  { id: 4, name: "Cosmética natural", slug: "cosmetica-natural", description: "Jabones, cremas, aceites esenciales" },
+  { id: 2, name: "Huerta y productos frescos", slug: "huerta-y-productos-frescos", description: "Frutas, verduras, huevos, plantas aromÃ¡ticas" },
+  { id: 3, name: "Bebidas naturales", slug: "bebidas-naturales", description: "TÃ©s, infusiones, jugos naturales" },
+  { id: 4, name: "CosmÃ©tica natural", slug: "cosmetica-natural", description: "Jabones, cremas, aceites esenciales" },
   { id: 5, name: "Bienestar y salud natural", slug: "bienestar-y-salud-natural", description: "Productos herbales, suplementos naturales" },
-  { id: 6, name: "Hogar sostenible", slug: "hogar-sostenible", description: "Productos reutilizables, limpieza ecológica" },
-  { id: 7, name: "Artesanías y productos regionales", slug: "artesanias-y-productos-regionales", description: "Madera, cerámica, textiles" },
+  { id: 6, name: "Hogar sostenible", slug: "hogar-sostenible", description: "Productos reutilizables, limpieza ecolÃ³gica" },
+  { id: 7, name: "ArtesanÃ­as y productos regionales", slug: "artesanias-y-productos-regionales", description: "Madera, cerÃ¡mica, textiles" },
   { id: 8, name: "Mascotas naturales", slug: "mascotas-naturales", description: "Alimentos y accesorios naturales" },
 ];
 
@@ -235,52 +235,52 @@ export const demoProducts: Product[] = [
     id: 1,
     name: "Miel natural de monte",
     slug: "miel-natural-de-monte",
-    description: "Miel regional de producción familiar, cosechada en pequeños lotes.",
+    description: "Miel regional de producciÃ³n familiar, cosechada en pequeÃ±os lotes.",
     price_cents: 420000,
     currency: "ARS",
     stock: 24,
     unit: "frasco",
-    province: "Córdoba",
+    province: "CÃ³rdoba",
     city: "Alta Gracia",
     production_type: "natural",
     delivery_type: "local",
     ecoscore_points: 90,
     category: demoCategories[0],
-    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
+    producer_profile: { id: 1, business_name: "Finca RaÃ­ces Verdes", slug: "finca-raices-verdes", province: "CÃ³rdoba", city: "Alta Gracia" },
   },
   {
     id: 2,
-    name: "Mix de hierbas para infusión",
+    name: "Mix de hierbas para infusiÃ³n",
     slug: "mix-de-hierbas-para-infusion",
     description: "Blend de hierbas regionales secadas naturalmente.",
     price_cents: 280000,
     currency: "ARS",
     stock: 40,
     unit: "paquete",
-    province: "Córdoba",
+    province: "CÃ³rdoba",
     city: "Alta Gracia",
     production_type: "regional",
     delivery_type: "local",
     ecoscore_points: 78,
     category: demoCategories[2],
-    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
+    producer_profile: { id: 1, business_name: "Finca RaÃ­ces Verdes", slug: "finca-raices-verdes", province: "CÃ³rdoba", city: "Alta Gracia" },
   },
   {
     id: 3,
-    name: "Jabón artesanal de caléndula",
+    name: "JabÃ³n artesanal de calÃ©ndula",
     slug: "jabon-artesanal-de-calendula",
-    description: "Jabón natural elaborado artesanalmente con aceite vegetal y caléndula.",
+    description: "JabÃ³n natural elaborado artesanalmente con aceite vegetal y calÃ©ndula.",
     price_cents: 190000,
     currency: "ARS",
     stock: 32,
     unit: "unidad",
-    province: "Córdoba",
+    province: "CÃ³rdoba",
     city: "Alta Gracia",
     production_type: "artesanal",
     delivery_type: "home_delivery",
     ecoscore_points: 84,
     category: demoCategories[3],
-    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
+    producer_profile: { id: 1, business_name: "Finca RaÃ­ces Verdes", slug: "finca-raices-verdes", province: "CÃ³rdoba", city: "Alta Gracia" },
   },
 ];
 
@@ -296,7 +296,7 @@ export function ecoLabel(score?: number) {
   if (!score) return "Sin EcoScore";
   if (score >= 80) return "EcoScore Alto";
   if (score >= 50) return "EcoScore Medio";
-  return "EcoScore Básico";
+  return "EcoScore BÃ¡sico";
 }
 
 export function ecoColor(score?: number) {
@@ -332,8 +332,8 @@ export function statusColor(status?: string) {
 export function productionTypeLabel(type?: string) {
   const labels: Record<string, string> = {
     natural: "Natural",
-    agroecologico: "Agroecológico",
-    organico: "Orgánico",
+    agroecologico: "AgroecolÃ³gico",
+    organico: "OrgÃ¡nico",
     artesanal: "Artesanal",
     regional: "Regional",
     industrial: "Industrial",
@@ -344,7 +344,7 @@ export function productionTypeLabel(type?: string) {
 export function deliveryTypeLabel(type?: string) {
   const labels: Record<string, string> = {
     local: "Retiro local",
-    home_delivery: "Envío a domicilio",
+    home_delivery: "EnvÃ­o a domicilio",
     pickup_point: "Punto de entrega",
     producer_pickup: "Retiro en el local",
   };
@@ -508,11 +508,11 @@ function normalizeApiMessage(payload: ApiErrorPayload, status: number): string {
     "";
 
   if (status === 401 || ["Unauthenticated", "Unauthenticated.", "Unauthorized"].includes(rawMessage)) {
-    return "No pudimos validar tu sesión. Iniciá sesión nuevamente.";
+    return "No pudimos validar tu sesiÃ³n. IniciÃ¡ sesiÃ³n nuevamente.";
   }
 
   if (status === 403 || rawMessage === "Forbidden") {
-    return "No tenés permiso para realizar esta acción.";
+    return "No tenÃ©s permiso para realizar esta acciÃ³n.";
   }
 
   if (payload?.errors && typeof payload.errors === "object") {
@@ -1009,7 +1009,7 @@ export function orderStatusLabel(status?: string): string {
   const labels: Record<string, string> = {
     pending: "Pendiente",
     confirmed: "Confirmado",
-    processing: "En preparación",
+    processing: "En preparaciÃ³n",
     shipped: "Enviado",
     delivered: "Entregado",
     cancelled: "Cancelado",
@@ -1061,4 +1061,33 @@ export function orderStatusColor(status?: string): string {
     case "returned": return "bg-orange-100 text-orange-800";
     default: return "bg-stone-100 text-stone-600";
   }
+}
+
+
+export type MercadoPagoCheckout = {
+  payment_intent: {
+    id: number;
+    provider: "mercado_pago";
+    mode: "sandbox" | "production";
+    status: string;
+    amount_cents: number;
+    preference_id?: string;
+    expires_at?: string;
+  };
+  orders: Order[];
+  orders_count: number;
+  checkout_url: string;
+  expires_at?: string;
+  message: string;
+};
+
+export async function checkoutWithMercadoPago(data: {
+  idempotency_key: string;
+  delivery_type?: string;
+  delivery_address?: string;
+  city?: string;
+  province?: string;
+  buyer_note?: string;
+}): Promise<MercadoPagoCheckout> {
+  return apiAuthPost<MercadoPagoCheckout>("/checkout/mercado-pago", data);
 }

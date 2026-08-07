@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\FavoriteController;
+use App\Http\Controllers\Api\MercadoPagoCheckoutController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\ProductImageController;
@@ -44,7 +45,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/users/me', [AuthController::class, 'me']);
 
         // Any authenticated buyer (or previously rejected seller) can apply to
-        // become a producer with their existing account — no second email needed.
+        // become a producer with their existing account â€” no second email needed.
         Route::post('/seller/apply', [SellerController::class, 'apply']);
 
         Route::middleware('role:buyer,seller')->group(function () {
@@ -58,6 +59,7 @@ Route::prefix('v1')->group(function () {
 
             Route::post('/checkout/buy-now', [OrderController::class, 'buyNow']);
             Route::post('/checkout/cart', [OrderController::class, 'checkoutCart']);
+            Route::post('/checkout/mercado-pago', [MercadoPagoCheckoutController::class, 'store']);
             Route::get('/orders', [OrderController::class, 'buyerOrders']);
             Route::get('/orders/{id}', [OrderController::class, 'show']);
             Route::get('/orders/{id}/tracking', [OrderController::class, 'tracking']);
