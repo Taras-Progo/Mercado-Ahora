@@ -115,6 +115,73 @@ export type PaymentSummary = {
   retry_allowed: boolean;
   orders?: Array<Pick<Order, "id" | "order_number" | "status" | "payment_status" | "total_cents">>;
 };
+
+export type AdminPayment = {
+  id: number;
+  reference: string;
+  provider: string;
+  mode: string;
+  status: PaymentStatus;
+  provider_status?: string | null;
+  provider_status_detail?: string | null;
+  amount_cents: number;
+  currency: string;
+  preference_id?: string | null;
+  provider_payment_id?: string | null;
+  requires_review: boolean;
+  processing_error?: string | null;
+  expires_at?: string | null;
+  approved_at?: string | null;
+  last_synced_at?: string | null;
+  created_at?: string | null;
+  buyer?: { id: number; name: string; email?: string };
+  orders: Array<Pick<Order, "id" | "order_number" | "status" | "payment_status" | "total_cents" | "created_at">>;
+  transactions_count: number;
+  webhook_events_count: number;
+  review_notes_count: number;
+};
+
+export type AdminPaymentDetail = AdminPayment & {
+  transactions: Array<{
+    id: number;
+    external_id?: string | null;
+    status: string;
+    status_detail?: string | null;
+    amount_cents: number;
+    currency: string;
+    payment_method_id?: string | null;
+    payment_type_id?: string | null;
+    live_mode?: boolean | null;
+    provider_created_at?: string | null;
+    provider_approved_at?: string | null;
+    created_at?: string | null;
+  }>;
+  status_history: Array<{
+    id: number;
+    from_status?: string | null;
+    to_status: string;
+    source: string;
+    provider_payment_id?: string | null;
+    created_at?: string | null;
+  }>;
+  webhook_events: Array<{
+    id: number;
+    event_type?: string | null;
+    external_id?: string | null;
+    resource_id?: string | null;
+    signature_valid: boolean;
+    status: string;
+    attempts: number;
+    processed_at?: string | null;
+    created_at?: string | null;
+  }>;
+  review_notes: Array<{
+    id: number;
+    note: string;
+    created_at?: string | null;
+    admin?: { id: number; name: string; email?: string };
+  }>;
+};
 export type Order = {
   id: number;
   order_number: string;
@@ -244,12 +311,12 @@ function apiUrl(path: string): string {
 
 export const demoCategories: Category[] = [
   { id: 1, name: "Alimentos naturales", slug: "alimentos-naturales", description: "Miel, mermeladas, conservas, frutos secos, granos" },
-  { id: 2, name: "Huerta y productos frescos", slug: "huerta-y-productos-frescos", description: "Frutas, verduras, huevos, plantas aromÃ¡ticas" },
-  { id: 3, name: "Bebidas naturales", slug: "bebidas-naturales", description: "TÃ©s, infusiones, jugos naturales" },
-  { id: 4, name: "CosmÃ©tica natural", slug: "cosmetica-natural", description: "Jabones, cremas, aceites esenciales" },
+  { id: 2, name: "Huerta y productos frescos", slug: "huerta-y-productos-frescos", description: "Frutas, verduras, huevos, plantas aromáticas" },
+  { id: 3, name: "Bebidas naturales", slug: "bebidas-naturales", description: "Tés, infusiones, jugos naturales" },
+  { id: 4, name: "Cosmética natural", slug: "cosmetica-natural", description: "Jabones, cremas, aceites esenciales" },
   { id: 5, name: "Bienestar y salud natural", slug: "bienestar-y-salud-natural", description: "Productos herbales, suplementos naturales" },
-  { id: 6, name: "Hogar sostenible", slug: "hogar-sostenible", description: "Productos reutilizables, limpieza ecolÃ³gica" },
-  { id: 7, name: "ArtesanÃ­as y productos regionales", slug: "artesanias-y-productos-regionales", description: "Madera, cerÃ¡mica, textiles" },
+  { id: 6, name: "Hogar sostenible", slug: "hogar-sostenible", description: "Productos reutilizables, limpieza ecológica" },
+  { id: 7, name: "Artesanías y productos regionales", slug: "artesanias-y-productos-regionales", description: "Madera, cerámica, textiles" },
   { id: 8, name: "Mascotas naturales", slug: "mascotas-naturales", description: "Alimentos y accesorios naturales" },
 ];
 
@@ -258,52 +325,52 @@ export const demoProducts: Product[] = [
     id: 1,
     name: "Miel natural de monte",
     slug: "miel-natural-de-monte",
-    description: "Miel regional de producciÃ³n familiar, cosechada en pequeÃ±os lotes.",
+    description: "Miel regional de producción familiar, cosechada en pequeños lotes.",
     price_cents: 420000,
     currency: "ARS",
     stock: 24,
     unit: "frasco",
-    province: "CÃ³rdoba",
+    province: "Córdoba",
     city: "Alta Gracia",
     production_type: "natural",
     delivery_type: "local",
     ecoscore_points: 90,
     category: demoCategories[0],
-    producer_profile: { id: 1, business_name: "Finca RaÃ­ces Verdes", slug: "finca-raices-verdes", province: "CÃ³rdoba", city: "Alta Gracia" },
+    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
   },
   {
     id: 2,
-    name: "Mix de hierbas para infusiÃ³n",
+    name: "Mix de hierbas para infusión",
     slug: "mix-de-hierbas-para-infusion",
     description: "Blend de hierbas regionales secadas naturalmente.",
     price_cents: 280000,
     currency: "ARS",
     stock: 40,
     unit: "paquete",
-    province: "CÃ³rdoba",
+    province: "Córdoba",
     city: "Alta Gracia",
     production_type: "regional",
     delivery_type: "local",
     ecoscore_points: 78,
     category: demoCategories[2],
-    producer_profile: { id: 1, business_name: "Finca RaÃ­ces Verdes", slug: "finca-raices-verdes", province: "CÃ³rdoba", city: "Alta Gracia" },
+    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
   },
   {
     id: 3,
-    name: "JabÃ³n artesanal de calÃ©ndula",
+    name: "Jabón artesanal de caléndula",
     slug: "jabon-artesanal-de-calendula",
-    description: "JabÃ³n natural elaborado artesanalmente con aceite vegetal y calÃ©ndula.",
+    description: "Jabón natural elaborado artesanalmente con aceite vegetal y caléndula.",
     price_cents: 190000,
     currency: "ARS",
     stock: 32,
     unit: "unidad",
-    province: "CÃ³rdoba",
+    province: "Córdoba",
     city: "Alta Gracia",
     production_type: "artesanal",
     delivery_type: "home_delivery",
     ecoscore_points: 84,
     category: demoCategories[3],
-    producer_profile: { id: 1, business_name: "Finca RaÃ­ces Verdes", slug: "finca-raices-verdes", province: "CÃ³rdoba", city: "Alta Gracia" },
+    producer_profile: { id: 1, business_name: "Finca Raíces Verdes", slug: "finca-raices-verdes", province: "Córdoba", city: "Alta Gracia" },
   },
 ];
 
@@ -319,7 +386,7 @@ export function ecoLabel(score?: number) {
   if (!score) return "Sin EcoScore";
   if (score >= 80) return "EcoScore Alto";
   if (score >= 50) return "EcoScore Medio";
-  return "EcoScore BÃ¡sico";
+  return "EcoScore Básico";
 }
 
 export function ecoColor(score?: number) {
@@ -355,8 +422,8 @@ export function statusColor(status?: string) {
 export function productionTypeLabel(type?: string) {
   const labels: Record<string, string> = {
     natural: "Natural",
-    agroecologico: "AgroecolÃ³gico",
-    organico: "OrgÃ¡nico",
+    agroecologico: "Agroecológico",
+    organico: "Orgánico",
     artesanal: "Artesanal",
     regional: "Regional",
     industrial: "Industrial",
@@ -367,7 +434,7 @@ export function productionTypeLabel(type?: string) {
 export function deliveryTypeLabel(type?: string) {
   const labels: Record<string, string> = {
     local: "Retiro local",
-    home_delivery: "EnvÃ­o a domicilio",
+    home_delivery: "Envío a domicilio",
     pickup_point: "Punto de entrega",
     producer_pickup: "Retiro en el local",
   };
@@ -531,11 +598,11 @@ function normalizeApiMessage(payload: ApiErrorPayload, status: number): string {
     "";
 
   if (status === 401 || ["Unauthenticated", "Unauthenticated.", "Unauthorized"].includes(rawMessage)) {
-    return "No pudimos validar tu sesiÃ³n. IniciÃ¡ sesiÃ³n nuevamente.";
+    return "No pudimos validar tu sesión. Iniciá sesión nuevamente.";
   }
 
   if (status === 403 || rawMessage === "Forbidden") {
-    return "No tenÃ©s permiso para realizar esta acciÃ³n.";
+    return "No tenés permiso para realizar esta acción.";
   }
 
   if (payload?.errors && typeof payload.errors === "object") {
@@ -980,6 +1047,33 @@ export async function updateAdminProductStatus(id: number, status: string): Prom
   return apiAuthPatch<Product>(`/admin/products/${id}/status`, { status });
 }
 
+export async function getAdminPayments(filters?: {
+  search?: string;
+  status?: string;
+  requires_review?: boolean;
+}): Promise<AdminPayment[]> {
+  const params = new URLSearchParams();
+  if (filters?.search) params.set("search", filters.search);
+  if (filters?.status) params.set("status", filters.status);
+  if (filters?.requires_review !== undefined) params.set("requires_review", filters.requires_review ? "1" : "0");
+  const suffix = params.toString() ? "?" + params.toString() : "";
+  return apiAuthGet<AdminPayment[]>("/admin/payments" + suffix);
+}
+
+export async function getAdminPayment(id: number): Promise<AdminPaymentDetail> {
+  return apiAuthGet<AdminPaymentDetail>("/admin/payments/" + id);
+}
+
+export async function addAdminPaymentReviewNote(
+  id: number,
+  note: string,
+): Promise<AdminPaymentDetail["review_notes"][number]> {
+  return apiAuthPost<AdminPaymentDetail["review_notes"][number]>(
+    "/admin/payments/" + id + "/review-notes",
+    { note },
+  );
+}
+
 export async function getAdminOrders(): Promise<Order[]> {
   try {
     return await apiAuthGet<Order[]>("/admin/orders");
@@ -1032,7 +1126,7 @@ export function orderStatusLabel(status?: string): string {
   const labels: Record<string, string> = {
     pending: "Pendiente",
     confirmed: "Confirmado",
-    processing: "En preparaciÃ³n",
+    processing: "En preparación",
     shipped: "Enviado",
     delivered: "Entregado",
     cancelled: "Cancelado",

@@ -29,4 +29,6 @@ class PaymentIntent extends Model
     public function reservations(): HasMany { return $this->hasMany(StockReservation::class); }
     public function transactions(): HasMany { return $this->hasMany(PaymentTransaction::class); }
     public function statusHistory(): HasMany { return $this->hasMany(PaymentStatusHistory::class); }
+    public function webhookEvents(): HasMany { return $this->hasMany(PaymentWebhookEvent::class); }
+    public function reviewNotes(): HasMany { return $this->hasMany(PaymentReviewNote::class); }
 }

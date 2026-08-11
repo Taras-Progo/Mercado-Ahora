@@ -679,12 +679,32 @@ Se implementó la experiencia operativa para comprador y productor:
 - notificaciones en cola, posteriores al commit e idempotentes por transición.
 ### 17.5 Verificación ejecutada
 
-- Suite Laravel completa: **62 pruebas, 61 aprobadas, 1 omitida, 420 aserciones**.
+- Suite Laravel completa: **65 pruebas, 64 aprobadas, 1 omitida, 437 aserciones**.
 - Pruebas específicas de Mercado Pago: **14 aprobadas, 123 aserciones**.
 - ESLint frontend: aprobado.
 - Build productivo de Next.js: aprobado, 41 rutas generadas.
 - Sintaxis PHP de servicios, controlador, migración y rutas: aprobada.
 
-### 17.6 Límite actual
+### 17.6 Parte 6A.5 - Completada
 
-Las Partes 6A.1 a 6A.4 quedan cerradas técnicamente. La URL de retorno del navegador nunca confirma un pago: comprador, productor y administración consumen el estado verificado por backend. Quedan pendientes **6A.5 - Administración básica de pagos** como módulo dedicado y **6A.6 - QA integral, configuración del webhook secreto, pruebas Sandbox completas y prueba real controlada**.
+Se implementó la administración operativa de pagos:
+
+- pestaña dedicada Pagos dentro del panel administrador;
+- búsqueda por referencia, pedido, comprador, email e identificadores de Mercado Pago;
+- filtros por estado y operaciones que requieren revisión;
+- detalle sanitizado de transacciones, webhooks e historial de estados;
+- vínculos con comprador y pedidos asociados;
+- notas internas persistentes con auditoría administrativa;
+- relación de webhooks procesados con la sesión de pago;
+- pantalla real Pagos y cobros para productores, con pedidos asociados.
+
+### 17.7 Parte 6A.6 - Cierre técnico y puerta de producción
+
+Quedaron incorporados el plan de QA reproducible, la guía técnica operativa, el procedimiento de diagnóstico, el paso de Sandbox a producción y la verificación de worker, scheduler, migraciones y dominios.
+
+La ingeniería del Hito 6A queda completa cuando la suite automatizada y la matriz manual Sandbox resulten aprobadas en el entorno desplegado. La prueba real controlada no puede declararse ejecutada mientras Mercado Pago permanezca en Sandbox: requiere credenciales productivas, autorización explícita y una operación real de monto bajo. Esta prueba es la puerta final de activación productiva, no una función faltante en el código.
+
+Documentos asociados:
+
+- docs/hito-6a-guia-tecnica-operativa.md
+- docs/hito-6a-plan-qa-evidencias.md

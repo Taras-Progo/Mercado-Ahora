@@ -4,8 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['provider', 'event_type', 'external_id', 'request_id', 'resource_id', 'signature_valid', 'payload', 'status', 'attempts', 'processed_at', 'processing_error'])]
+#[Fillable(['payment_intent_id', 'provider', 'event_type', 'external_id', 'request_id', 'resource_id', 'signature_valid', 'payload', 'status', 'attempts', 'processed_at', 'processing_error'])]
 class PaymentWebhookEvent extends Model
 {
     protected function casts(): array

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\AdminPaymentController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CartController;
 use App\Http\Controllers\Api\CatalogController;
@@ -133,6 +134,9 @@ Route::prefix('v1')->group(function () {
             Route::get('/admin/returns', [AdminController::class, 'returns']);
             Route::patch('/admin/returns/{id}/status', [AdminController::class, 'updateReturnStatus']);
             Route::get('/admin/audit-logs', [AdminController::class, 'auditLogs']);
+            Route::get('/admin/payments', [AdminPaymentController::class, 'index']);
+            Route::get('/admin/payments/{paymentIntent}', [AdminPaymentController::class, 'show']);
+            Route::post('/admin/payments/{paymentIntent}/review-notes', [AdminPaymentController::class, 'storeReviewNote']);
         });
     });
 });

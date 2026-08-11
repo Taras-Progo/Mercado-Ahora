@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Contracts\PaymentGateway;
+use App\Models\PaymentIntent;
 use App\Models\PaymentWebhookEvent;
 use App\Services\Payments\MercadoPagoPaymentProcessor;
 use Illuminate\Bus\Queueable;
@@ -38,6 +39,15 @@ class ProcessMercadoPagoWebhook implements ShouldQueue
 
         try {
             $payment = $gateway->getPayment((string) $event->resource_id);
+            $reference = (string) ($payment['external_reference'] ?? '');
+            if ($reference !== '') {
+                $intentId = PaymentIntent::query()
+                    ->where('internal_reference', $reference)
+                    ->value('id');
+                if ($intentId) {
+                    $event->update(['payment_intent_id' => $intentId]);
+                }
+            }
             $processor->processProviderPayment($payment, 'webhook');
             $event->update(['status' => 'processed', 'processed_at' => now(), 'processing_error' => null]);
         } catch (Throwable $exception) {

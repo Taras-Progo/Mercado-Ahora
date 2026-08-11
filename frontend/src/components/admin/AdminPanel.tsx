@@ -8,14 +8,16 @@ import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminReturns } from "@/components/admin/AdminReturns";
+import { AdminPayments } from "@/components/admin/AdminPayments";
 
-type Tab = "users" | "producers" | "products" | "orders" | "returns";
+type Tab = "users" | "producers" | "products" | "orders" | "payments" | "returns";
 
 const tabs: { id: Tab; label: string }[] = [
   { id: "users", label: "Usuarios" },
   { id: "producers", label: "Productores" },
   { id: "products", label: "Productos" },
   { id: "orders", label: "Pedidos" },
+  { id: "payments", label: "Pagos" },
   { id: "returns", label: "Devoluciones" },
 ];
 
@@ -63,6 +65,7 @@ export function AdminPanel() {
       {tab === "producers" && <ProducerReview />}
       {tab === "products" && <AdminProducts />}
       {tab === "orders" && <AdminOrders />}
+      {tab === "payments" && <AdminPayments />}
       {tab === "returns" && <AdminReturns />}
     </div>
   );
