@@ -143,6 +143,6 @@ done
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml pull postgres caddy || true
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml build
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml up -d --remove-orphans
-docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml restart caddy
 docker compose --env-file "$ENV_FILE" -f docker-compose.prod.yml ps
 docker image prune -f
