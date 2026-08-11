@@ -30,40 +30,143 @@ class MercadoPagoCheckoutService
             ->first();
 
         if ($existing) {
-            if ($existing->status === 'preference_created') {
+            if (in_array($existing->status, ['pending', 'preference_created'], true)) {
                 return $this->responseData($existing);
             }
 
             throw new HttpResponseException(response()->json([
-                'message' => 'Este intento de pago ya está siendo procesado. Esperá unos segundos antes de reintentar.',
+                'message' => 'Este intento de pago ya fue utilizado. Generá un nuevo intento para continuar.',
             ], 409));
         }
 
         $expiresAt = now()->addMinutes((int) config('services.mercado_pago.reservation_minutes', 30));
         $intent = DB::transaction(fn () => $this->createPendingCheckout($buyer, $cart, $data, $expiresAt));
 
+        return $this->createPreference($intent, $idempotencyKey, $cart);
+    }
+
+    /** @return array<string, mixed> */
+    public function retry(User $buyer, PaymentIntent $failedIntent, string $idempotencyKey): array
+    {
+        if ($failedIntent->buyer_id !== $buyer->id) {
+            abort(403);
+        }
+
+        if (! in_array($failedIntent->status, ['rejected', 'cancelled', 'expired', 'failed'], true)) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Este pago no admite un nuevo intento.',
+            ], 422));
+        }
+
+        $expiresAt = now()->addMinutes((int) config('services.mercado_pago.reservation_minutes', 30));
+        $intent = DB::transaction(function () use ($failedIntent, $buyer, $idempotencyKey, $expiresAt): PaymentIntent {
+            $orderIds = $failedIntent->orders()->pluck('orders.id');
+
+            $blockingIntent = PaymentIntent::query()
+                ->where('id', '!=', $failedIntent->id)
+                ->whereIn('status', ['creating', 'pending', 'preference_created', 'approved'])
+                ->whereHas('orders', fn ($query) => $query->whereIn('orders.id', $orderIds))
+                ->lockForUpdate()
+                ->first();
+
+            if ($blockingIntent) {
+                throw new HttpResponseException(response()->json([
+                    'message' => $blockingIntent->status === 'approved'
+                        ? 'Este pedido ya tiene un pago aprobado.'
+                        : 'Ya existe otro pago pendiente para este pedido.',
+                ], 409));
+            }
+
+            $orders = Order::query()->with('items')->whereIn('id', $orderIds)->orderBy('id')->lockForUpdate()->get();
+            $conflicts = [];
+
+            foreach ($orders->flatMap->items as $item) {
+                $product = Product::query()->lockForUpdate()->find($item->product_id);
+                $reserved = StockReservation::query()
+                    ->where('product_id', $item->product_id)
+                    ->where('status', 'active')
+                    ->where('expires_at', '>', now())
+                    ->sum('quantity');
+                $available = max(0, (int) ($product?->stock ?? 0) - (int) $reserved);
+
+                if (! $product || $product->status !== 'active' || $item->quantity > $available) {
+                    $conflicts[] = [
+                        'item_id' => null,
+                        'product_id' => $item->product_id,
+                        'product_name' => $item->product_name,
+                        'requested_quantity' => (int) $item->quantity,
+                        'available_stock' => $available,
+                        'status' => $product?->status ?? 'unavailable',
+                    ];
+                }
+            }
+
+            if ($conflicts !== []) {
+                throw new HttpResponseException(response()->json([
+                    'message' => 'No hay stock suficiente para volver a intentar este pago.',
+                    'conflicts' => $conflicts,
+                ], 422));
+            }
+
+            $intent = PaymentIntent::query()->create([
+                'order_id' => $orders->first()->id,
+                'buyer_id' => $buyer->id,
+                'internal_reference' => (string) Str::uuid(),
+                'idempotency_key' => $idempotencyKey,
+                'provider' => 'mercado_pago',
+                'mode' => (string) config('services.mercado_pago.mode', 'sandbox'),
+                'amount_cents' => $orders->sum('total_cents'),
+                'currency' => 'ARS',
+                'status' => 'creating',
+                'expires_at' => $expiresAt,
+                'reserved_at' => now(),
+            ]);
+            $intent->orders()->attach($orderIds);
+
+            foreach ($orders as $order) {
+                $order->update(['status' => 'pending', 'payment_status' => 'pending']);
+                $order->statusHistory()->create([
+                    'changed_by' => $buyer->id,
+                    'status' => 'pending',
+                    'note' => 'Se inició un nuevo intento de pago con Mercado Pago.',
+                ]);
+
+                foreach ($order->items as $item) {
+                    StockReservation::query()->create([
+                        'payment_intent_id' => $intent->id,
+                        'order_id' => $order->id,
+                        'order_item_id' => $item->id,
+                        'product_id' => $item->product_id,
+                        'quantity' => $item->quantity,
+                        'status' => 'active',
+                        'expires_at' => $expiresAt,
+                    ]);
+                }
+            }
+
+            return $intent;
+        }, 3);
+
+        return $this->createPreference($intent, $idempotencyKey);
+    }
+
+    /** @return array<string, mixed> */
+    private function createPreference(PaymentIntent $intent, string $idempotencyKey, ?Cart $cart = null): array
+    {
         try {
-            $preference = $this->gateway->createPreference(
-                $this->preferencePayload($intent),
-                $idempotencyKey,
-            );
+            $preference = $this->gateway->createPreference($this->preferencePayload($intent), $idempotencyKey);
         } catch (PaymentGatewayException $exception) {
             DB::transaction(function () use ($intent): void {
-                $intent->reservations()->where('status', 'active')->update([
-                    'status' => 'released',
-                    'released_at' => now(),
-                ]);
-                $intent->orders()->update(['payment_status' => 'failed']);
-                $intent->update(['status' => 'failed']);
+                $intent->reservations()->where('status', 'active')->update(['status' => 'released', 'released_at' => now()]);
+                $intent->orders()->update(['status' => 'cancelled', 'payment_status' => 'failed']);
+                $intent->update(['status' => 'failed', 'processing_error' => $exception->getMessage()]);
             });
 
-            throw new HttpResponseException(response()->json([
-                'message' => $exception->getMessage(),
-            ], 503));
+            throw new HttpResponseException(response()->json(['message' => $exception->getMessage()], 503));
         }
 
         $intent->update([
-            'status' => 'preference_created',
+            'status' => 'pending',
             'external_id' => (string) $preference['id'],
             'preference_id' => (string) $preference['id'],
             'checkout_url' => $preference['init_point'] ?? null,
@@ -74,7 +177,7 @@ class MercadoPagoCheckoutService
             ],
         ]);
 
-        $cart->items()->delete();
+        $cart?->items()->delete();
 
         return $this->responseData($intent->fresh());
     }
@@ -82,14 +185,12 @@ class MercadoPagoCheckoutService
     private function createPendingCheckout(User $buyer, Cart $cart, array $data, $expiresAt): PaymentIntent
     {
         $cartItems = $cart->items()->with('product')->get();
-
         if ($cartItems->isEmpty()) {
             throw new HttpResponseException(response()->json(['message' => 'El carrito está vacío.'], 422));
         }
 
         $prepared = [];
         $conflicts = [];
-
         foreach ($cartItems as $cartItem) {
             $product = Product::query()->lockForUpdate()->findOrFail($cartItem->product_id);
             $reserved = StockReservation::query()
@@ -112,7 +213,6 @@ class MercadoPagoCheckoutService
             }
 
             $prepared[] = [
-                'cart_item' => $cartItem,
                 'product' => $product,
                 'quantity' => (int) $cartItem->quantity,
                 'unit_price_cents' => (int) $product->price_cents,
@@ -146,7 +246,6 @@ class MercadoPagoCheckoutService
         ]);
 
         $intent->orders()->attach($orders->pluck('id'));
-
         foreach ($orders as $order) {
             foreach ($order->items as $orderItem) {
                 StockReservation::query()->create([
@@ -206,7 +305,7 @@ class MercadoPagoCheckoutService
     /** @return array<string, mixed> */
     private function preferencePayload(PaymentIntent $intent): array
     {
-        $intent->load('orders.items');
+        $intent->load('orders.items', 'buyer');
         $items = $intent->orders->flatMap(fn (Order $order) => $order->items->map(fn ($item) => [
             'id' => (string) $item->product_id,
             'title' => $item->product_name,
@@ -215,15 +314,24 @@ class MercadoPagoCheckoutService
             'unit_price' => round($item->unit_price_cents / 100, 2),
         ]))->values()->all();
 
+        $referenceQuery = '?reference='.rawurlencode((string) $intent->internal_reference);
+
         return [
             'items' => $items,
             'payer' => ['email' => $intent->buyer->email],
             'external_reference' => $intent->internal_reference,
             'notification_url' => (string) config('services.mercado_pago.webhook_url'),
             'back_urls' => [
-                'success' => (string) config('services.mercado_pago.success_url'),
-                'pending' => (string) config('services.mercado_pago.pending_url'),
-                'failure' => (string) config('services.mercado_pago.failure_url'),
+                'success' => rtrim((string) config('services.mercado_pago.success_url'), '?&').$referenceQuery,
+                'pending' => rtrim((string) config('services.mercado_pago.pending_url'), '?&').$referenceQuery,
+                'failure' => rtrim((string) config('services.mercado_pago.failure_url'), '?&').$referenceQuery,
+            ],
+            'payment_methods' => [
+                'excluded_payment_types' => [
+                    ['id' => 'ticket'],
+                    ['id' => 'atm'],
+                    ['id' => 'bank_transfer'],
+                ],
             ],
             'auto_return' => 'approved',
             'expires' => true,
@@ -238,15 +346,23 @@ class MercadoPagoCheckoutService
     }
 
     /** @return array<string, mixed> */
-    private function responseData(PaymentIntent $intent): array
+    public function responseData(PaymentIntent $intent): array
     {
-        $intent->load('orders.items.product.producerProfile', 'reservations');
+        $intent->load('orders.items.product.producerProfile');
         $checkoutUrl = $intent->mode === 'sandbox'
             ? ($intent->sandbox_checkout_url ?: $intent->checkout_url)
             : $intent->checkout_url;
 
         return [
-            'payment_intent' => $intent,
+            'payment_intent' => [
+                'id' => $intent->id,
+                'reference' => $intent->internal_reference,
+                'provider' => $intent->provider,
+                'status' => $intent->status,
+                'amount_cents' => $intent->amount_cents,
+                'currency' => $intent->currency,
+                'expires_at' => $intent->expires_at?->toIso8601String(),
+            ],
             'orders' => $intent->orders,
             'orders_count' => $intent->orders->count(),
             'checkout_url' => $checkoutUrl,

@@ -260,7 +260,7 @@ MERCADO_PAGO_WEBHOOK_SECRET=<sandbox-webhook-secret>
 MERCADO_PAGO_SUCCESS_URL=https://mercadoahora.com.ar/checkout/pago/aprobado
 MERCADO_PAGO_PENDING_URL=https://mercadoahora.com.ar/checkout/pago/pendiente
 MERCADO_PAGO_FAILURE_URL=https://mercadoahora.com.ar/checkout/pago/fallido
-MERCADO_PAGO_WEBHOOK_URL=https://api.mercadoahora.com.ar/api/v1/webhooks/mercado-pago
+MERCADO_PAGO_WEBHOOK_URL=https://api.mercadoahora.com.ar/api/v1/payments/webhooks/mercado_pago
 ```
 
 Antes de comenzar la configuracion, se debe regenerar el Access Token Sandbox compartido mediante mensajeria y guardar el nuevo valor directamente como secreto. Aunque sea una credencial de prueba, no debe continuar utilizandose despues de haber sido expuesta fuera del gestor de secretos.
@@ -601,7 +601,7 @@ Al finalizar el Hito 6A, Mercado Ahora dispondra de una primera version de pagos
 Esta base permitira ampliar el modulo posteriormente sin rehacer el flujo principal de pagos.
 
 
-## 17. Estado de implementación: Partes 6A.1 y 6A.2
+## 17. Estado de implementación: Partes 6A.1 a 6A.4
 
 **Fecha de cierre técnico:** 7 de agosto de 2026.
 
@@ -642,14 +642,49 @@ Se implementó el inicio de pago desde el checkout:
 - carrito eliminado solamente después de crear correctamente la preferencia;
 - conflictos de stock estructurados y mensajes en español.
 
-### 17.3 Verificación ejecutada
+### 17.3 Parte 6A.3 - Completada
 
-- Suite Laravel completa: **52 pruebas, 51 aprobadas, 1 omitida, 331 aserciones**.
-- Pruebas específicas de Mercado Pago: **4 aprobadas, 34 aserciones**.
+Se implementó el ciclo transaccional verificado de Mercado Pago:
+
+- firma oficial del webhook mediante `x-signature`, `x-request-id`, identificador del recurso y secreto protegido;
+- persistencia idempotente de eventos y procesamiento asíncrono mediante cola de base de datos;
+- consulta server-to-server del pago antes de modificar pedidos o inventario;
+- validación de referencia, importe, moneda y entorno Sandbox/producción;
+- normalización de estados externos y protección del estado aprobado como terminal;
+- transacciones con bloqueos de fila para pagos, pedidos, reservas y productos;
+- consumo de reservas y descuento de stock exactamente una vez al aprobar;
+- liberación sin descuento para rechazo, cancelación o vencimiento;
+- revisión administrativa cuando un pago tardío no puede consumir stock con seguridad;
+- historial de estados, transacciones e identificadores externos únicos;
+- tarea programada por minuto que consulta Mercado Pago antes de liberar reservas;
+- contenedores independientes para `queue:work` y `schedule:work`;
+- bloqueo de preparación y envío para pedidos Mercado Pago aún no aprobados;
+- exclusión de medios diferidos para conservar solo métodos de acreditación inmediata.
+
+### 17.4 Parte 6A.4 - Completada
+
+Se implementó la experiencia operativa para comprador y productor:
+
+- páginas `/checkout/pago/aprobado`, `/checkout/pago/pendiente` y `/checkout/pago/fallido`;
+- consulta y sondeo del estado interno sin confiar en parámetros de estado del navegador;
+- endpoint autenticado de resumen de pago por referencia;
+- reintento seguro para pagos rechazados, cancelados, vencidos o recuperables;
+- revalidación de productos y stock sin crear pedidos duplicados;
+- estados, importes y explicaciones en español dentro de pedidos del comprador;
+- estado de pago y habilitación de preparación dentro de pedidos del productor;
+- resumen de pago también visible en el detalle administrativo de pedidos;
+- etiquetas y colores de pago centralizados en frontend;
+- correos en español para aprobación, pendiente, rechazo, cancelación y vencimiento;
+- aviso al productor únicamente cuando el pedido queda pagado y habilitado;
+- notificaciones en cola, posteriores al commit e idempotentes por transición.
+### 17.5 Verificación ejecutada
+
+- Suite Laravel completa: **62 pruebas, 61 aprobadas, 1 omitida, 420 aserciones**.
+- Pruebas específicas de Mercado Pago: **14 aprobadas, 123 aserciones**.
 - ESLint frontend: aprobado.
-- Build productivo de Next.js: aprobado, 38 rutas generadas.
+- Build productivo de Next.js: aprobado, 41 rutas generadas.
 - Sintaxis PHP de servicios, controlador, migración y rutas: aprobada.
 
-### 17.4 Límite actual
+### 17.6 Límite actual
 
-Las Partes 6A.1 y 6A.2 permiten crear la preferencia Sandbox y reservar stock. La confirmación real del pago, consumo o liberación automática de reservas y sincronización definitiva de pedidos se implementarán en **6A.3 - Webhooks, estados y consistencia transaccional**. Hasta completar 6A.3, una URL de retorno del navegador no se considera confirmación de pago.
+Las Partes 6A.1 a 6A.4 quedan cerradas técnicamente. La URL de retorno del navegador nunca confirma un pago: comprador, productor y administración consumen el estado verificado por backend. Quedan pendientes **6A.5 - Administración básica de pagos** como módulo dedicado y **6A.6 - QA integral, configuración del webhook secreto, pruebas Sandbox completas y prueba real controlada**.

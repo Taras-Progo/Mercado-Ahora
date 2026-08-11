@@ -60,6 +60,8 @@ Route::prefix('v1')->group(function () {
             Route::post('/checkout/buy-now', [OrderController::class, 'buyNow']);
             Route::post('/checkout/cart', [OrderController::class, 'checkoutCart']);
             Route::post('/checkout/mercado-pago', [MercadoPagoCheckoutController::class, 'store']);
+            Route::get('/payments/intents/{reference}', [MercadoPagoCheckoutController::class, 'show']);
+            Route::post('/payments/intents/{reference}/retry', [MercadoPagoCheckoutController::class, 'retry']);
             Route::get('/orders', [OrderController::class, 'buyerOrders']);
             Route::get('/orders/{id}', [OrderController::class, 'show']);
             Route::get('/orders/{id}/tracking', [OrderController::class, 'tracking']);

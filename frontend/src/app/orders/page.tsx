@@ -5,6 +5,7 @@ import Link from "next/link";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { PaymentSummaryCard } from "@/components/payments/PaymentSummaryCard";
 import type { Order } from "@/lib/api";
 import {
   deliveryTypeLabel,
@@ -247,6 +248,8 @@ function OrderDetails({
           </div>
         ))}
       </div>
+
+      {order.payment_summary && <PaymentSummaryCard payment={order.payment_summary} allowRetry />}
 
       {(order.delivery_type || order.delivery_address || order.city || order.province) && (
         <div className="mt-3 rounded-lg border border-border-soft bg-white p-3 text-sm">

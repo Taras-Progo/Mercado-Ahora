@@ -14,6 +14,7 @@ import {
   updateAdminOrderStatus,
 } from "@/lib/api";
 import { ChevronDownIcon, PackageIcon, SearchIcon } from "@/components/ui/Icons";
+import { PaymentSummaryCard } from "@/components/payments/PaymentSummaryCard";
 
 export function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -171,6 +172,8 @@ export function AdminOrders() {
                         ))}
                       </ul>
                     </section>
+
+                    {order.payment_summary && <PaymentSummaryCard payment={order.payment_summary} />}
 
                     {order.return_requests && order.return_requests.length > 0 && (
                       <section className="rounded-xl bg-white p-4">

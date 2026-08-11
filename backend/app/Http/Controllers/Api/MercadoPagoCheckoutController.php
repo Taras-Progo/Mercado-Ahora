@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\PaymentIntent;
 use App\Services\Payments\MercadoPagoCheckoutService;
+use App\Services\Payments\PaymentSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class MercadoPagoCheckoutController extends Controller
 {
@@ -22,8 +25,42 @@ class MercadoPagoCheckoutController extends Controller
 
         $cart = $request->user()->cart()->firstOrCreate();
 
+        return response()->json(['data' => $checkout->start($request->user(), $cart, $data)], 201);
+    }
+
+    public function show(Request $request, string $reference, PaymentSummaryService $summary): JsonResponse
+    {
+        $intent = PaymentIntent::query()
+            ->with('orders:id,order_number,status,payment_status,total_cents')
+            ->where('internal_reference', $reference)
+            ->where('buyer_id', $request->user()->id)
+            ->firstOrFail();
+
         return response()->json([
-            'data' => $checkout->start($request->user(), $cart, $data),
+            'data' => [
+                ...$summary->forIntent($intent),
+                'orders' => $intent->orders->map->only(['id', 'order_number', 'status', 'payment_status', 'total_cents'])->values(),
+            ],
+        ]);
+    }
+
+    public function retry(
+        Request $request,
+        string $reference,
+        MercadoPagoCheckoutService $checkout,
+    ): JsonResponse {
+        $data = $request->validate(['idempotency_key' => ['nullable', 'uuid']]);
+        $intent = PaymentIntent::query()
+            ->where('internal_reference', $reference)
+            ->where('buyer_id', $request->user()->id)
+            ->firstOrFail();
+
+        return response()->json([
+            'data' => $checkout->retry(
+                $request->user(),
+                $intent,
+                $data['idempotency_key'] ?? (string) Str::uuid(),
+            ),
         ], 201);
     }
 }

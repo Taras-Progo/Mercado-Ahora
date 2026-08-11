@@ -93,6 +93,28 @@ export type CatalogFilters = {
   provinces: CatalogProvinceFilter[];
 };
 
+export type PaymentStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "cancelled"
+  | "expired"
+  | "requires_review"
+  | "failed";
+
+export type PaymentSummary = {
+  provider: string;
+  reference: string;
+  status: PaymentStatus;
+  amount_cents: number;
+  currency: string;
+  approved_at?: string | null;
+  expires_at?: string | null;
+  last_synced_at?: string | null;
+  requires_review: boolean;
+  retry_allowed: boolean;
+  orders?: Array<Pick<Order, "id" | "order_number" | "status" | "payment_status" | "total_cents">>;
+};
 export type Order = {
   id: number;
   order_number: string;
@@ -124,6 +146,7 @@ export type Order = {
     created_at: string;
   }>;
   return_requests?: ReturnRequest[];
+  payment_summary?: PaymentSummary | null;
 };
 
 export type CartItem = {
@@ -1071,6 +1094,7 @@ export type MercadoPagoCheckout = {
     mode: "sandbox" | "production";
     status: string;
     amount_cents: number;
+    reference: string;
     preference_id?: string;
     expires_at?: string;
   };
@@ -1090,4 +1114,53 @@ export async function checkoutWithMercadoPago(data: {
   buyer_note?: string;
 }): Promise<MercadoPagoCheckout> {
   return apiAuthPost<MercadoPagoCheckout>("/checkout/mercado-pago", data);
+}
+export async function getPaymentIntent(reference: string): Promise<PaymentSummary> {
+  return apiAuthGet<PaymentSummary>(`/payments/intents/${encodeURIComponent(reference)}`);
+}
+
+export async function retryPaymentIntent(reference: string): Promise<MercadoPagoCheckout> {
+  return apiAuthPost<MercadoPagoCheckout>(
+    `/payments/intents/${encodeURIComponent(reference)}/retry`,
+    { idempotency_key: window.crypto.randomUUID() },
+  );
+}
+
+export function paymentStatusLabel(status?: string): string {
+  const labels: Record<string, string> = {
+    pending: "Pendiente",
+    approved: "Aprobado",
+    rejected: "Rechazado",
+    cancelled: "Cancelado",
+    expired: "Vencido",
+    requires_review: "En revisión",
+    failed: "No completado",
+  };
+  return status ? (labels[status] ?? humanizeInternalLabel(status)) : "";
+}
+
+export function paymentStatusColor(status?: string): string {
+  switch (status) {
+    case "approved": return "bg-emerald-100 text-emerald-800";
+    case "pending": return "bg-amber-100 text-amber-800";
+    case "rejected":
+    case "cancelled":
+    case "expired":
+    case "failed": return "bg-red-100 text-red-800";
+    case "requires_review": return "bg-sky-100 text-sky-800";
+    default: return "bg-stone-100 text-stone-700";
+  }
+}
+
+export function paymentStatusExplanation(status?: string): string {
+  const explanations: Record<string, string> = {
+    pending: "Mercado Pago todavía está procesando la operación. Te avisaremos cuando cambie.",
+    approved: "Mercado Pago validó el pago. El productor ya puede preparar tu pedido.",
+    rejected: "Mercado Pago rechazó el pago. Podés revisar el medio elegido e intentarlo nuevamente.",
+    cancelled: "El pago fue cancelado y la reserva de stock quedó liberada.",
+    expired: "La reserva venció antes de confirmarse. Podés reintentar si todavía hay stock.",
+    requires_review: "Estamos revisando la operación antes de habilitar la preparación del pedido.",
+    failed: "No pudimos completar el pago. Podés volver a intentarlo.",
+  };
+  return status ? (explanations[status] ?? "Estamos verificando el estado de tu pago.") : "";
 }

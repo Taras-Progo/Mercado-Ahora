@@ -44,6 +44,7 @@ jobs:
             export MERCADO_PAGO_PENDING_URL="${{ secrets.MERCADO_PAGO_PENDING_URL }}"
             export MERCADO_PAGO_FAILURE_URL="${{ secrets.MERCADO_PAGO_FAILURE_URL }}"
             export MERCADO_PAGO_WEBHOOK_URL="${{ secrets.MERCADO_PAGO_WEBHOOK_URL }}"
+            export MERCADO_PAGO_WEBHOOK_SECRET="${{ secrets.MERCADO_PAGO_WEBHOOK_SECRET }}"
 
             if [ ! -x "$(command -v docker)" ]; then
               curl -fsSL https://raw.githubusercontent.com/Taras-Progo/Mercado-Ahora/main/deploy/provision-ubuntu.sh -o /tmp/provision-mercado.sh

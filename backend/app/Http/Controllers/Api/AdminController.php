@@ -11,6 +11,7 @@ use App\Models\ProducerProfile;
 use App\Models\ReturnRequest;
 use App\Models\User;
 use App\Notifications\ProductModerationNoteNotification;
+use App\Services\Payments\PaymentSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -339,23 +340,24 @@ class AdminController extends Controller
         return response()->json(['data' => $this->loadAdminProduct($product)]);
     }
 
-    public function orders(): JsonResponse
+    public function orders(PaymentSummaryService $payments): JsonResponse
     {
-        return response()->json([
-            'data' => Order::query()
-                ->with('buyer', 'items.product', 'statusHistory', 'returnRequests')
-                ->latest()
-                ->get(),
-        ]);
+        $orders = Order::query()
+            ->with('buyer', 'items.product', 'statusHistory', 'returnRequests', 'paymentIntents')
+            ->latest()
+            ->get();
+
+        return response()->json(['data' => $payments->attachToOrders($orders)]);
     }
 
-    public function order(int $id): JsonResponse
+    public function order(int $id, PaymentSummaryService $payments): JsonResponse
     {
-        return response()->json([
-            'data' => Order::query()
-                ->with('buyer', 'items.product', 'statusHistory', 'returnRequests')
-                ->findOrFail($id),
-        ]);
+        $order = Order::query()
+            ->with('buyer', 'items.product', 'statusHistory', 'returnRequests', 'paymentIntents')
+            ->findOrFail($id);
+        $order->setAttribute('payment_summary', $payments->forOrder($order));
+
+        return response()->json(['data' => $order]);
     }
 
     public function updateOrderStatus(Request $request, int $id): JsonResponse

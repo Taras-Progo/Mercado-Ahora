@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
+import { PaymentSummaryCard } from "@/components/payments/PaymentSummaryCard";
 import { SellerBackLink } from "@/components/seller/SellerBackLink";
 import type { Order } from "@/lib/api";
 import {
@@ -264,6 +265,10 @@ function SellerOrdersView() {
                           </ul>
                         </div>
 
+                        {(detail?.payment_summary ?? order.payment_summary) && (
+                          <PaymentSummaryCard payment={(detail?.payment_summary ?? order.payment_summary)!} />
+                        )}
+
                         {(detail?.delivery_type || detail?.delivery_address || detail?.city) && (
                           <div className="rounded-xl bg-cream-card p-3 text-sm">
                             <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-stone-500">
@@ -323,12 +328,19 @@ function SellerOrdersView() {
                           </div>
                         )}
 
+                        {(detail?.payment_summary ?? order.payment_summary)?.provider === "mercado_pago" &&
+                          (detail?.payment_summary ?? order.payment_summary)?.status !== "approved" && (
+                            <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                              La preparación y el envío se habilitan cuando Mercado Pago confirma el pago.
+                            </p>
+                          )}
                         <div className="flex flex-col gap-2 border-t border-border-soft pt-4 sm:flex-row sm:items-center sm:justify-between">
                           <div className="flex items-center gap-2">
                             <label className="text-sm font-medium text-stone-700">Estado:</label>
                             <select
                               value={statusDraft}
                               onChange={(e) => setStatusDraft(e.target.value)}
+                              disabled={(detail?.payment_summary ?? order.payment_summary)?.provider === "mercado_pago" && (detail?.payment_summary ?? order.payment_summary)?.status !== "approved"}
                               className="rounded-full border border-border-soft px-4 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-olive/30"
                             >
                               {SELLER_ORDER_STATUSES.map((s) => (
@@ -341,7 +353,12 @@ function SellerOrdersView() {
                           <button
                             type="button"
                             onClick={() => handleUpdateStatus(order.id)}
-                            disabled={savingStatus || statusDraft === detail?.status}
+                            disabled={
+                              savingStatus ||
+                              statusDraft === detail?.status ||
+                              ((detail?.payment_summary ?? order.payment_summary)?.provider === "mercado_pago" &&
+                                (detail?.payment_summary ?? order.payment_summary)?.status !== "approved")
+                            }
                             className="rounded-full bg-olive px-5 py-2 text-sm font-semibold text-white transition hover:bg-olive-dark disabled:opacity-50"
                           >
                             {savingStatus ? "Guardando..." : "Actualizar estado"}

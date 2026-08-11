@@ -18,8 +18,7 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
-    env_file:
-      - ./.env.production
+    env_file: [./.env.production]
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
@@ -31,6 +30,56 @@ services:
       DB_PASSWORD: ${POSTGRES_PASSWORD}
     depends_on:
       postgres:
+        condition: service_healthy
+    volumes:
+      - backend_storage:/var/www/html/storage
+    healthcheck:
+      test: ["CMD-SHELL", "php -r \"exit(@fsockopen('127.0.0.1', 8000) ? 0 : 1);\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  queue:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: [./.env.production]
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      SKIP_STARTUP_TASKS: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB:-mercado_ahora}
+      DB_USERNAME: ${POSTGRES_USER:-mercado_ahora}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    command: ["php", "artisan", "queue:work", "--sleep=3", "--tries=5", "--timeout=90", "--backoff=10"]
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - backend_storage:/var/www/html/storage
+
+  scheduler:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    env_file: [./.env.production]
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      SKIP_STARTUP_TASKS: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB:-mercado_ahora}
+      DB_USERNAME: ${POSTGRES_USER:-mercado_ahora}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+    command: ["php", "artisan", "schedule:work"]
+    depends_on:
+      backend:
         condition: service_healthy
     volumes:
       - backend_storage:/var/www/html/storage
@@ -46,23 +95,19 @@ services:
       PORT: 3000
       INTERNAL_API_BASE_URL: http://backend:8000/api/v1
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
-    env_file:
-      - ./.env.production
-    ports:
-      - "80:80"
-      - "443:443"
+    env_file: [./.env.production]
+    ports: ["80:80", "443:443"]
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on:
-      - frontend
-      - backend
+    depends_on: [frontend, backend]
 
 volumes:
   postgres_data:

@@ -63,7 +63,7 @@ class MercadoPagoCheckoutTest extends TestCase
         ])->assertCreated()
             ->assertJsonPath('data.orders_count', 2)
             ->assertJsonPath('data.checkout_url', 'https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_test_123')
-            ->assertJsonPath('data.payment_intent.status', 'preference_created')
+            ->assertJsonPath('data.payment_intent.status', 'pending')
             ->assertJsonPath('data.payment_intent.provider', 'mercado_pago');
 
         $intentId = $response->json('data.payment_intent.id');

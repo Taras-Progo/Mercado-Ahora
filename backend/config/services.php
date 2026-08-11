@@ -24,6 +24,8 @@ return [
         'success_url' => env('MERCADO_PAGO_SUCCESS_URL', env('FRONTEND_URL').'/checkout/pago/aprobado'),
         'pending_url' => env('MERCADO_PAGO_PENDING_URL', env('FRONTEND_URL').'/checkout/pago/pendiente'),
         'failure_url' => env('MERCADO_PAGO_FAILURE_URL', env('FRONTEND_URL').'/checkout/pago/fallido'),
-        'webhook_url' => env('MERCADO_PAGO_WEBHOOK_URL', env('APP_URL').'/api/v1/payments/webhooks/mercado-pago'),
+        'webhook_url' => env('MERCADO_PAGO_WEBHOOK_URL', env('APP_URL').'/api/v1/payments/webhooks/mercado_pago'),
+        'webhook_secret' => env('MERCADO_PAGO_WEBHOOK_SECRET'),
+        'webhook_tolerance_seconds' => (int) env('MERCADO_PAGO_WEBHOOK_TOLERANCE_SECONDS', 300),
     ],
 ];

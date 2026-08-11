@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\PaymentIntent;
 use App\Models\Product;
 use App\Models\ReturnRequest;
+use App\Services\Payments\PaymentSummaryService;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -96,25 +97,27 @@ class OrderController extends Controller
         ], 201);
     }
 
-    public function buyerOrders(Request $request): JsonResponse
+    public function buyerOrders(Request $request, PaymentSummaryService $payments): JsonResponse
     {
-        return response()->json([
-            'data' => $request->user()->orders()
-                ->with('items.product.producerProfile', 'statusHistory', 'returnRequests')
-                ->latest()
-                ->get(),
-        ]);
+        $orders = $request->user()->orders()
+            ->with('items.product.producerProfile', 'statusHistory', 'returnRequests', 'paymentIntents')
+            ->latest()
+            ->get();
+
+        return response()->json(['data' => $payments->attachToOrders($orders)]);
     }
 
-    public function show(Request $request, int $id): JsonResponse
+    public function show(Request $request, int $id, PaymentSummaryService $payments): JsonResponse
     {
         $order = Order::query()
-            ->with('items.product.producerProfile', 'statusHistory', 'returnRequests')
+            ->with('items.product.producerProfile', 'statusHistory', 'returnRequests', 'paymentIntents')
             ->findOrFail($id);
 
         if (! $request->user()->isAdmin() && $order->buyer_id !== $request->user()->id) {
             abort(403);
         }
+
+        $order->setAttribute('payment_summary', $payments->forOrder($order));
 
         return response()->json(['data' => $order]);
     }
@@ -126,29 +129,28 @@ class OrderController extends Controller
         return response()->json(['data' => $order->statusHistory]);
     }
 
-    public function sellerOrders(Request $request): JsonResponse
+    public function sellerOrders(Request $request, PaymentSummaryService $payments): JsonResponse
     {
         $profile = $request->user()->producerProfile ?? abort(422, 'Perfil de productor requerido.');
+        $orders = Order::query()
+            ->with('buyer', 'items.product', 'returnRequests', 'paymentIntents')
+            ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
+            ->latest()
+            ->get();
 
-        return response()->json([
-            'data' => Order::query()
-                ->with('buyer', 'items.product', 'returnRequests')
-                ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
-                ->latest()
-                ->get(),
-        ]);
+        return response()->json(['data' => $payments->attachToOrders($orders)]);
     }
 
-    public function sellerOrder(Request $request, int $id): JsonResponse
+    public function sellerOrder(Request $request, int $id, PaymentSummaryService $payments): JsonResponse
     {
         $profile = $request->user()->producerProfile ?? abort(422, 'Perfil de productor requerido.');
+        $order = Order::query()
+            ->with('items.product', 'buyer', 'statusHistory', 'returnRequests', 'paymentIntents')
+            ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
+            ->findOrFail($id);
+        $order->setAttribute('payment_summary', $payments->forOrder($order));
 
-        return response()->json([
-            'data' => Order::query()
-                ->with('items.product', 'buyer', 'statusHistory', 'returnRequests')
-                ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
-                ->findOrFail($id),
-        ]);
+        return response()->json(['data' => $order]);
     }
 
     public function updateSellerStatus(Request $request, int $id): JsonResponse
@@ -160,8 +162,14 @@ class OrderController extends Controller
         ]);
 
         $order = Order::query()
+            ->with('paymentIntents')
             ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
             ->findOrFail($id);
+
+        $mercadoPagoIntent = $order->paymentIntents->firstWhere('provider', 'mercado_pago');
+        if ($mercadoPagoIntent && $order->payment_status !== 'approved') {
+            abort(422, 'El pago con Mercado Pago todavía no fue aprobado. No podés preparar ni enviar este pedido.');
+        }
 
         $order->update(['status' => $data['status']]);
         $order->statusHistory()->create([
