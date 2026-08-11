@@ -26,3 +26,9 @@ www.mercadoahora.com.ar {
     tls internal
     redir https://mercadoahora.com.ar{uri} permanent
 }
+
+api.mercadoahora.com.ar {
+    tls internal
+    encode gzip zstd
+    reverse_proxy backend:8000
+}
