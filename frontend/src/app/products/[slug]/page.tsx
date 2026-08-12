@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type { Product } from "@/lib/api";
@@ -14,7 +14,7 @@ import {
   productionTypeLabel,
   deliveryTypeLabel,
   addToCart,
-  buyNow,
+  checkoutWithMercadoPago,
   createConversation,
 } from "@/lib/api";
 import { ProductCard } from "@/components/ui/ProductCard";
@@ -50,7 +50,7 @@ export default function ProductDetailPage() {
   const [buyQuantity, setBuyQuantity] = useState(1);
   const [buyingNow, setBuyingNow] = useState(false);
   const [buyError, setBuyError] = useState("");
-  const [buySuccess, setBuySuccess] = useState<{ orderNumber: string } | null>(null);
+  const buyAttemptKey = useRef<string | null>(null);
   const [startingChat, setStartingChat] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -117,12 +117,19 @@ export default function ProductDetailPage() {
     setBuyingNow(true);
     setBuyError("");
     try {
-      const order = await buyNow({
+      if (!buyAttemptKey.current) {
+        buyAttemptKey.current = window.crypto.randomUUID();
+      }
+      const checkout = await checkoutWithMercadoPago({
+        idempotency_key: buyAttemptKey.current,
         product_id: product.id,
         quantity: buyQuantity,
         delivery_type: product.delivery_type,
       });
-      setBuySuccess({ orderNumber: order.order_number });
+      if (!checkout.checkout_url) {
+        throw new Error("No pudimos abrir Mercado Pago. Intentá nuevamente.");
+      }
+      window.location.assign(checkout.checkout_url);
     } catch (err) {
       setBuyError(err instanceof Error ? err.message : "Error al crear el pedido.");
     } finally {
@@ -393,7 +400,7 @@ export default function ProductDetailPage() {
                         return;
                       }
                       setBuyError("");
-                      setBuySuccess(null);
+                      buyAttemptKey.current = null;
                       setBuyQuantity(1);
                       setShowBuyModal(true);
                     }}
@@ -567,47 +574,19 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* Success */}
-            {buySuccess && (
-              <div className="mt-4 rounded-xl bg-emerald-50 px-4 py-3 text-center">
-                <CheckCircleIcon className="mx-auto h-8 w-8 text-emerald-600 mb-1" />
-                <p className="text-sm font-semibold text-emerald-700">
-                  ¡Pedido creado con éxito!
-                </p>
-                <p className="mt-1 text-sm text-emerald-700">
-                  N° {buySuccess.orderNumber}
-                </p>
-                <p className="mt-2 text-xs text-emerald-700">
-                  El pedido queda pendiente. Coordina pago y entrega con el productor hasta integrar pagos online.
-                </p>
-                <div className="mt-3 flex gap-2">
-                  <Link
-                    href="/orders"
-                    className="flex-1 rounded-full bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 text-center"
-                    onClick={() => setShowBuyModal(false)}
-                  >
-                    Ver mis pedidos
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowBuyModal(false);
-                      setBuySuccess(null);
-                    }}
-                    className="flex-1 rounded-full border border-emerald-300 px-4 py-2 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                  >
-                    Cerrar
-                  </button>
-                </div>
-              </div>
-            )}
-
             {/* Actions */}
-            {!buySuccess && (
-              <div className="mt-6 flex gap-3">
+            <p className="mt-4 text-xs leading-relaxed text-brown-muted">
+              Al continuar, reservaremos el stock durante 30 minutos y te
+              redirigiremos a Mercado Pago Sandbox. El pedido se confirma solo
+              cuando Mercado Pago aprueba el pago.
+            </p>
+            <div className="mt-6 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowBuyModal(false)}
+                  onClick={() => {
+                    setShowBuyModal(false);
+                    buyAttemptKey.current = null;
+                  }}
                   className="flex-1 rounded-full border border-border-soft px-4 py-2.5 text-sm font-semibold text-brown-muted transition hover:bg-stone-100"
                 >
                   Cancelar
@@ -618,10 +597,9 @@ export default function ProductDetailPage() {
                   disabled={buyingNow}
                   className="flex-1 rounded-full bg-olive px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-olive-dark disabled:opacity-60"
                 >
-                  {buyingNow ? "Procesando..." : "Confirmar compra"}
+                  {buyingNow ? "Preparando pago..." : "Ir a Mercado Pago"}
                 </button>
               </div>
-            )}
           </div>
         </div>
       )}

@@ -46,6 +46,33 @@ class MercadoPagoCheckoutService
     }
 
     /** @return array<string, mixed> */
+    public function startBuyNow(User $buyer, Product $product, int $quantity, array $data): array
+    {
+        $idempotencyKey = $data['idempotency_key'];
+        $existing = PaymentIntent::query()
+            ->where('buyer_id', $buyer->id)
+            ->where('idempotency_key', $idempotencyKey)
+            ->first();
+
+        if ($existing) {
+            if (in_array($existing->status, ['pending', 'preference_created'], true)) {
+                return $this->responseData($existing);
+            }
+
+            throw new HttpResponseException(response()->json([
+                'message' => 'Este intento de pago ya fue utilizado. Genera un nuevo intento para continuar.',
+            ], 409));
+        }
+
+        $expiresAt = now()->addMinutes((int) config('services.mercado_pago.reservation_minutes', 30));
+        $intent = DB::transaction(
+            fn () => $this->createPendingBuyNow($buyer, $product, $quantity, $data, $expiresAt),
+        );
+
+        return $this->createPreference($intent, $idempotencyKey);
+    }
+
+    /** @return array<string, mixed> */
     public function retry(User $buyer, PaymentIntent $failedIntent, string $idempotencyKey): array
     {
         if ($failedIntent->buyer_id !== $buyer->id) {
@@ -263,6 +290,73 @@ class MercadoPagoCheckoutService
         return $intent;
     }
 
+    private function createPendingBuyNow(
+        User $buyer,
+        Product $requestedProduct,
+        int $quantity,
+        array $data,
+        $expiresAt,
+    ): PaymentIntent {
+        $product = Product::query()->lockForUpdate()->findOrFail($requestedProduct->id);
+        $reserved = StockReservation::query()
+            ->where('product_id', $product->id)
+            ->where('status', 'active')
+            ->where('expires_at', '>', now())
+            ->sum('quantity');
+        $available = max(0, (int) $product->stock - (int) $reserved);
+
+        if ($product->status !== 'active' || $quantity > $available) {
+            throw new HttpResponseException(response()->json([
+                'message' => $product->status !== 'active'
+                    ? 'Este producto ya no esta disponible para comprar.'
+                    : 'No hay stock suficiente para completar la compra.',
+                'conflicts' => [[
+                    'item_id' => null,
+                    'product_id' => $product->id,
+                    'product_name' => $product->name,
+                    'requested_quantity' => $quantity,
+                    'available_stock' => $available,
+                    'status' => $product->status,
+                ]],
+            ], 422));
+        }
+
+        $order = $this->createPendingOrder($buyer, [[
+            'product' => $product,
+            'quantity' => $quantity,
+            'unit_price_cents' => (int) $product->price_cents,
+        ]], $data);
+
+        $intent = PaymentIntent::query()->create([
+            'order_id' => $order->id,
+            'buyer_id' => $buyer->id,
+            'internal_reference' => (string) Str::uuid(),
+            'idempotency_key' => $data['idempotency_key'],
+            'provider' => 'mercado_pago',
+            'mode' => (string) config('services.mercado_pago.mode', 'sandbox'),
+            'amount_cents' => $order->total_cents,
+            'currency' => 'ARS',
+            'status' => 'creating',
+            'expires_at' => $expiresAt,
+            'reserved_at' => now(),
+        ]);
+
+        $intent->orders()->attach($order->id);
+        foreach ($order->items as $orderItem) {
+            StockReservation::query()->create([
+                'payment_intent_id' => $intent->id,
+                'order_id' => $order->id,
+                'order_item_id' => $orderItem->id,
+                'product_id' => $orderItem->product_id,
+                'quantity' => $orderItem->quantity,
+                'status' => 'active',
+                'expires_at' => $expiresAt,
+            ]);
+        }
+
+        return $intent;
+    }
+
     private function createPendingOrder(User $buyer, array $items, array $data): Order
     {
         $subtotal = collect($items)->sum(fn (array $item) => $item['unit_price_cents'] * $item['quantity']);
@@ -316,9 +410,8 @@ class MercadoPagoCheckoutService
 
         $referenceQuery = '?reference='.rawurlencode((string) $intent->internal_reference);
 
-        return [
+        $payload = [
             'items' => $items,
-            'payer' => ['email' => $intent->buyer->email],
             'external_reference' => $intent->internal_reference,
             'notification_url' => (string) config('services.mercado_pago.webhook_url'),
             'back_urls' => [
@@ -343,6 +436,14 @@ class MercadoPagoCheckoutService
                 'order_ids' => $intent->orders->pluck('id')->all(),
             ],
         ];
+
+        // Sandbox must use a Mercado Pago test buyer. A real marketplace email
+        // can prevent otherwise valid test cards from being accepted.
+        if ($intent->mode !== 'sandbox') {
+            $payload['payer'] = ['email' => $intent->buyer->email];
+        }
+
+        return $payload;
     }
 
     /** @return array<string, mixed> */
@@ -358,7 +459,9 @@ class MercadoPagoCheckoutService
                 'id' => $intent->id,
                 'reference' => $intent->internal_reference,
                 'provider' => $intent->provider,
+                'mode' => $intent->mode,
                 'status' => $intent->status,
+                'preference_id' => $intent->preference_id,
                 'amount_cents' => $intent->amount_cents,
                 'currency' => $intent->currency,
                 'expires_at' => $intent->expires_at?->toIso8601String(),

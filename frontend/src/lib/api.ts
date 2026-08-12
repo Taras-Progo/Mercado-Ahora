@@ -1201,6 +1201,8 @@ export type MercadoPagoCheckout = {
 
 export async function checkoutWithMercadoPago(data: {
   idempotency_key: string;
+  product_id?: number;
+  quantity?: number;
   delivery_type?: string;
   delivery_address?: string;
   city?: string;

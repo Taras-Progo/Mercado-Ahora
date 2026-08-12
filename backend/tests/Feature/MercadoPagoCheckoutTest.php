@@ -144,6 +144,71 @@ class MercadoPagoCheckoutTest extends TestCase
         $this->assertDatabaseHas('order_items', ['product_id' => $product->id, 'unit_price_cents' => 7500]);
     }
 
+    public function test_buy_now_creates_preference_order_and_reservation_without_using_cart(): void
+    {
+        $buyer = $this->buyer();
+        $product = $this->product('Miel', 5000, 3, 'La Colmena');
+        Sanctum::actingAs($buyer);
+
+        $response = $this->postJson('/api/v1/checkout/mercado-pago', [
+            'idempotency_key' => (string) Str::uuid(),
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'delivery_type' => 'home_delivery',
+        ])->assertCreated()
+            ->assertJsonPath('data.orders_count', 1)
+            ->assertJsonPath('data.payment_intent.mode', 'sandbox')
+            ->assertJsonPath('data.payment_intent.amount_cents', 10000)
+            ->assertJsonPath('data.checkout_url', 'https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_test_123');
+
+        $this->assertDatabaseHas('orders', [
+            'id' => $response->json('data.orders.0.id'),
+            'buyer_id' => $buyer->id,
+            'status' => 'pending',
+            'payment_status' => 'pending',
+        ]);
+        $this->assertDatabaseHas('stock_reservations', [
+            'payment_intent_id' => $response->json('data.payment_intent.id'),
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'status' => 'active',
+        ]);
+        $this->assertSame(3, $product->fresh()->stock);
+        $this->assertDatabaseCount('cart_items', 0);
+
+        Http::assertSent(function (ClientRequest $request): bool {
+            $payload = $request->data();
+
+            return ! array_key_exists('payer', $payload)
+                && $payload['items'][0]['quantity'] === 2;
+        });
+    }
+
+    public function test_buy_now_is_idempotent_and_reports_reserved_stock_conflicts(): void
+    {
+        $buyer = $this->buyer();
+        $product = $this->product('Miel', 5000, 2, 'La Colmena');
+        Sanctum::actingAs($buyer);
+        $payload = [
+            'idempotency_key' => (string) Str::uuid(),
+            'product_id' => $product->id,
+            'quantity' => 2,
+        ];
+
+        $first = $this->postJson('/api/v1/checkout/mercado-pago', $payload)->assertCreated();
+        $second = $this->postJson('/api/v1/checkout/mercado-pago', $payload)->assertCreated();
+        $this->assertSame($first->json('data.payment_intent.id'), $second->json('data.payment_intent.id'));
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('payment_intents', 1);
+
+        $this->postJson('/api/v1/checkout/mercado-pago', [
+            'idempotency_key' => (string) Str::uuid(),
+            'product_id' => $product->id,
+            'quantity' => 1,
+        ])->assertStatus(422)
+            ->assertJsonPath('conflicts.0.product_id', $product->id)
+            ->assertJsonPath('conflicts.0.available_stock', 0);
+    }
     private function buyer(string $email = 'buyer@example.com'): User
     {
         return User::factory()->create(['email' => $email, 'role' => 'buyer', 'status' => 'active']);
