@@ -48,6 +48,11 @@ export default function ProductDetailPage() {
   const [cartMessage, setCartMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [buyQuantity, setBuyQuantity] = useState(1);
+  const [buyDeliveryType, setBuyDeliveryType] = useState("");
+  const [buyProvince, setBuyProvince] = useState("");
+  const [buyCity, setBuyCity] = useState("");
+  const [buyDeliveryAddress, setBuyDeliveryAddress] = useState("");
+  const [buyNote, setBuyNote] = useState("");
   const [buyingNow, setBuyingNow] = useState(false);
   const [buyError, setBuyError] = useState("");
   const buyAttemptKey = useRef<string | null>(null);
@@ -114,6 +119,19 @@ export default function ProductDetailPage() {
   const handleBuyNow = async () => {
     if (!product) return;
     if (!canBuy) return;
+    if (!buyDeliveryType) {
+      setBuyError("Seleccion\u00e1 c\u00f3mo quer\u00e9s recibir el producto.");
+      return;
+    }
+    const needsDeliveryAddress = ["home_delivery", "pickup_point"].includes(buyDeliveryType);
+    if (
+      needsDeliveryAddress &&
+      (!buyProvince.trim() || !buyCity.trim() || !buyDeliveryAddress.trim())
+    ) {
+      setBuyError("Complet\u00e1 la provincia, ciudad y direcci\u00f3n de entrega.");
+      return;
+    }
+
     setBuyingNow(true);
     setBuyError("");
     try {
@@ -124,7 +142,11 @@ export default function ProductDetailPage() {
         idempotency_key: buyAttemptKey.current,
         product_id: product.id,
         quantity: buyQuantity,
-        delivery_type: product.delivery_type,
+        delivery_type: buyDeliveryType,
+        delivery_address: buyDeliveryAddress.trim() || undefined,
+        city: buyCity.trim() || undefined,
+        province: buyProvince.trim() || undefined,
+        buyer_note: buyNote.trim() || undefined,
       });
       if (!checkout.checkout_url) {
         throw new Error("No pudimos abrir Mercado Pago. Intentá nuevamente.");
@@ -399,6 +421,11 @@ export default function ProductDetailPage() {
                         router.push(loginRedirectUrl(currentPathWithSearch()));
                         return;
                       }
+                      setBuyDeliveryType(product.delivery_type ?? "");
+                      setBuyProvince("");
+                      setBuyCity("");
+                      setBuyDeliveryAddress("");
+                      setBuyNote("");
                       setBuyError("");
                       buyAttemptKey.current = null;
                       setBuyQuantity(1);
@@ -513,8 +540,8 @@ export default function ProductDetailPage() {
 
       {/* Buy Now Modal */}
       {showBuyModal && product && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
             <h3 className="font-serif text-xl font-bold text-foreground">
               Comprar ahora
             </h3>
@@ -567,6 +594,80 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
+            <div className="mt-5 border-t border-border-soft pt-5">
+              <h4 className="text-sm font-semibold text-foreground">
+                Datos de entrega
+              </h4>
+              <p className="mt-1 text-xs leading-relaxed text-brown-muted">
+                Confirm&aacute; c&oacute;mo recibir&aacute;s el producto antes de iniciar el pago.
+              </p>
+
+              <div className="mt-4 grid gap-4">
+                <label className="grid gap-1.5 text-sm font-medium text-stone-700">
+                  Forma de entrega
+                  <select
+                    value={buyDeliveryType}
+                    onChange={(event) => {
+                      setBuyDeliveryType(event.target.value);
+                      setBuyError("");
+                    }}
+                    className="h-11 rounded-lg border border-border-soft bg-white px-3 text-sm text-foreground outline-none focus:border-olive"
+                  >
+                    <option value="">Seleccion&aacute; una opci&oacute;n</option>
+                    <option value="home_delivery">Env&iacute;o a domicilio</option>
+                    <option value="pickup_point">Punto de retiro</option>
+                    <option value="producer_pickup">Retiro con el productor</option>
+                    <option value="local">Retiro local</option>
+                  </select>
+                </label>
+
+                {["home_delivery", "pickup_point"].includes(buyDeliveryType) && (
+                  <>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="grid gap-1.5 text-sm font-medium text-stone-700">
+                        Provincia
+                        <input
+                          value={buyProvince}
+                          onChange={(event) => setBuyProvince(event.target.value)}
+                          className="h-11 rounded-lg border border-border-soft px-3 text-sm text-foreground outline-none focus:border-olive"
+                          autoComplete="address-level1"
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-medium text-stone-700">
+                        Ciudad
+                        <input
+                          value={buyCity}
+                          onChange={(event) => setBuyCity(event.target.value)}
+                          className="h-11 rounded-lg border border-border-soft px-3 text-sm text-foreground outline-none focus:border-olive"
+                          autoComplete="address-level2"
+                        />
+                      </label>
+                    </div>
+                    <label className="grid gap-1.5 text-sm font-medium text-stone-700">
+                      Direcci&oacute;n de entrega
+                      <input
+                        value={buyDeliveryAddress}
+                        onChange={(event) => setBuyDeliveryAddress(event.target.value)}
+                        className="h-11 rounded-lg border border-border-soft px-3 text-sm text-foreground outline-none focus:border-olive"
+                        autoComplete="street-address"
+                      />
+                    </label>
+                  </>
+                )}
+
+                <label className="grid gap-1.5 text-sm font-medium text-stone-700">
+                  Nota para el productor (opcional)
+                  <textarea
+                    value={buyNote}
+                    onChange={(event) => setBuyNote(event.target.value)}
+                    rows={3}
+                    className="resize-none rounded-lg border border-border-soft px-3 py-2.5 text-sm text-foreground outline-none focus:border-olive"
+                    placeholder="Indicaciones para coordinar la entrega"
+                  />
+                </label>
+              </div>
+            </div>
+
             {/* Error */}
             {buyError && (
               <div className="mt-4 rounded-full bg-red-50 px-4 py-2 text-sm text-center text-red-700">
@@ -580,7 +681,7 @@ export default function ProductDetailPage() {
               redirigiremos a Mercado Pago Sandbox. El pedido se confirma solo
               cuando Mercado Pago aprueba el pago.
             </p>
-            <div className="mt-6 flex gap-3">
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => {

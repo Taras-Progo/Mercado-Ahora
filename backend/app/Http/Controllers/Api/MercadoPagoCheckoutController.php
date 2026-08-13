@@ -10,20 +10,30 @@ use App\Services\Payments\PaymentSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class MercadoPagoCheckoutController extends Controller
 {
     public function store(Request $request, MercadoPagoCheckoutService $checkout): JsonResponse
     {
+        $isBuyNow = $request->filled('product_id');
+        $needsDeliveryAddress = in_array($request->input('delivery_type'), ['home_delivery', 'pickup_point'], true);
+
         $data = $request->validate([
             'idempotency_key' => ['required', 'uuid'],
             'product_id' => ['nullable', 'required_with:quantity', 'integer', 'exists:products,id'],
             'quantity' => ['nullable', 'required_with:product_id', 'integer', 'min:1'],
-            'delivery_type' => ['nullable', 'string', 'max:120'],
-            'delivery_address' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:120'],
-            'province' => ['nullable', 'string', 'max:120'],
-            'buyer_note' => ['nullable', 'string'],
+            'delivery_type' => [Rule::requiredIf($isBuyNow), 'nullable', Rule::in(['home_delivery', 'pickup_point', 'producer_pickup', 'local'])],
+            'delivery_address' => [Rule::requiredIf($isBuyNow && $needsDeliveryAddress), 'nullable', 'string', 'max:255'],
+            'city' => [Rule::requiredIf($isBuyNow && $needsDeliveryAddress), 'nullable', 'string', 'max:120'],
+            'province' => [Rule::requiredIf($isBuyNow && $needsDeliveryAddress), 'nullable', 'string', 'max:120'],
+            'buyer_note' => ['nullable', 'string', 'max:1000'],
+        ], [
+            'delivery_type.required' => "Seleccion\u{00e1} c\u{00f3}mo quer\u{00e9}s recibir el producto.",
+            'delivery_type.in' => "La forma de entrega seleccionada no es v\u{00e1}lida.",
+            'delivery_address.required' => "Complet\u{00e1} la direcci\u{00f3}n de entrega.",
+            'city.required' => "Complet\u{00e1} la ciudad de entrega.",
+            'province.required' => "Complet\u{00e1} la provincia de entrega.",
         ]);
 
         if (isset($data['product_id'])) {

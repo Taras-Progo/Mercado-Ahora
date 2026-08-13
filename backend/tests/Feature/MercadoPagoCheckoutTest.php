@@ -155,6 +155,10 @@ class MercadoPagoCheckoutTest extends TestCase
             'product_id' => $product->id,
             'quantity' => 2,
             'delivery_type' => 'home_delivery',
+            'delivery_address' => 'Calle 123',
+            'city' => 'Alta Gracia',
+            'province' => 'Cordoba',
+            'buyer_note' => 'Tocar timbre.',
         ])->assertCreated()
             ->assertJsonPath('data.orders_count', 1)
             ->assertJsonPath('data.payment_intent.mode', 'sandbox')
@@ -166,6 +170,10 @@ class MercadoPagoCheckoutTest extends TestCase
             'buyer_id' => $buyer->id,
             'status' => 'pending',
             'payment_status' => 'pending',
+            'delivery_type' => 'home_delivery',
+            'delivery_address' => 'Calle 123',
+            'city' => 'Alta Gracia',
+            'province' => 'Cordoba',
         ]);
         $this->assertDatabaseHas('stock_reservations', [
             'payment_intent_id' => $response->json('data.payment_intent.id'),
@@ -192,6 +200,7 @@ class MercadoPagoCheckoutTest extends TestCase
         $payload = [
             'idempotency_key' => (string) Str::uuid(),
             'product_id' => $product->id,
+            'delivery_type' => 'producer_pickup',
             'quantity' => 2,
         ];
 
@@ -204,10 +213,31 @@ class MercadoPagoCheckoutTest extends TestCase
         $this->postJson('/api/v1/checkout/mercado-pago', [
             'idempotency_key' => (string) Str::uuid(),
             'product_id' => $product->id,
+            'delivery_type' => 'producer_pickup',
             'quantity' => 1,
         ])->assertStatus(422)
             ->assertJsonPath('conflicts.0.product_id', $product->id)
             ->assertJsonPath('conflicts.0.available_stock', 0);
+    }
+
+    public function test_buy_now_requires_complete_delivery_information_before_creating_payment(): void
+    {
+        $buyer = $this->buyer();
+        $product = $this->product('Miel', 5000, 3, 'La Colmena');
+        Sanctum::actingAs($buyer);
+
+        $this->postJson('/api/v1/checkout/mercado-pago', [
+            'idempotency_key' => (string) Str::uuid(),
+            'product_id' => $product->id,
+            'quantity' => 1,
+            'delivery_type' => 'home_delivery',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['delivery_address', 'city', 'province']);
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('payment_intents', 0);
+        $this->assertDatabaseCount('stock_reservations', 0);
+        Http::assertNothingSent();
     }
     private function buyer(string $email = 'buyer@example.com'): User
     {
