@@ -267,6 +267,49 @@ class MercadoPagoLifecycleTest extends TestCase
         $this->assertSame(3, StockReservation::query()->where('status', 'active')->sum('quantity'));
     }
 
+    public function test_sandbox_accepts_checkout_pro_test_buyer_when_provider_reports_live_mode(): void
+    {
+        [, , $intent, $products] = $this->checkoutWithTwoProducers();
+        $payment = $this->providerPayment($intent, 'approved', 'payment-test-buyer-1');
+        $payment['live_mode'] = true;
+        $payment['payer'] = ['email' => 'test_user_123@testuser.com'];
+
+        app(MercadoPagoPaymentProcessor::class)->processProviderPayment($payment);
+
+        $this->assertSame('approved', $intent->fresh()->status);
+        $this->assertFalse($intent->fresh()->requires_review);
+        $this->assertSame(8, $products[0]->fresh()->stock);
+        $this->assertSame(3, $products[1]->fresh()->stock);
+    }
+
+    public function test_sandbox_rejects_live_payment_without_mercado_pago_test_buyer(): void
+    {
+        [, , $intent, $products] = $this->checkoutWithTwoProducers();
+        $payment = $this->providerPayment($intent, 'approved', 'payment-invalid-live-1');
+        $payment['live_mode'] = true;
+        $payment['payer'] = ['email' => 'buyer@example.com'];
+
+        app(MercadoPagoPaymentProcessor::class)->processProviderPayment($payment);
+
+        $this->assertSame('requires_review', $intent->fresh()->status);
+        $this->assertSame(10, $products[0]->fresh()->stock);
+        $this->assertSame(4, $products[1]->fresh()->stock);
+    }
+
+    public function test_sandbox_rejects_payment_from_another_collector(): void
+    {
+        [, , $intent, $products] = $this->checkoutWithTwoProducers();
+        $intent->update(['preference_id' => '3594962572-preference-test']);
+        $payment = $this->providerPayment($intent, 'approved', 'payment-wrong-collector-1');
+        $payment['collector_id'] = 9999999999;
+
+        app(MercadoPagoPaymentProcessor::class)->processProviderPayment($payment);
+
+        $this->assertSame('requires_review', $intent->fresh()->status);
+        $this->assertSame(10, $products[0]->fresh()->stock);
+        $this->assertSame(4, $products[1]->fresh()->stock);
+    }
+
     public function test_late_approval_after_release_requires_review_when_stock_is_not_reserved(): void
     {
         [, , $intent, $products] = $this->checkoutWithTwoProducers();

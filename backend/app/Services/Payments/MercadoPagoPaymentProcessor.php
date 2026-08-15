@@ -51,12 +51,12 @@ class MercadoPagoPaymentProcessor
             $currency = strtoupper((string) ($payment['currency_id'] ?? ''));
             $amountCents = (int) round(((float) ($payment['transaction_amount'] ?? 0)) * 100);
             $liveMode = (bool) ($payment['live_mode'] ?? false);
-            $expectedLiveMode = $intent->mode === 'production';
 
             if ($providerPaymentId === ''
                 || $currency !== $intent->currency
                 || $amountCents !== (int) $intent->amount_cents
-                || $liveMode !== $expectedLiveMode) {
+                || ! $this->collectorMatches($intent, $payment)
+                || ! $this->environmentMatches($intent, $payment)) {
                 return $this->markForReview(
                     $intent,
                     $providerPaymentId ?: null,
@@ -133,6 +133,35 @@ class MercadoPagoPaymentProcessor
 
             return $this->markForReview($intent, $providerPaymentId, $providerStatus, 'Mercado Pago informó un estado que requiere revisión administrativa.', $source);
         }, 3);
+    }
+
+    /** @param array<string, mixed> $payment */
+    private function environmentMatches(PaymentIntent $intent, array $payment): bool
+    {
+        $liveMode = (bool) ($payment['live_mode'] ?? false);
+        $payerEmail = strtolower(trim((string) data_get($payment, 'payer.email', '')));
+        $isMercadoPagoTestBuyer = str_ends_with($payerEmail, '@testuser.com');
+
+        if ($intent->mode === 'production') {
+            return $liveMode && ! $isMercadoPagoTestBuyer;
+        }
+
+        // Checkout Pro test-account payments can be reported as live_mode=true.
+        // In Sandbox, accept that response only when Mercado Pago identifies its test buyer.
+        return ! $liveMode || $isMercadoPagoTestBuyer;
+    }
+
+    /** @param array<string, mixed> $payment */
+    private function collectorMatches(PaymentIntent $intent, array $payment): bool
+    {
+        $preferenceId = (string) $intent->preference_id;
+        if (! preg_match('/^(\d+)-/', $preferenceId, $matches)) {
+            return true;
+        }
+
+        $collectorId = trim((string) ($payment['collector_id'] ?? ''));
+
+        return $collectorId !== '' && hash_equals($matches[1], $collectorId);
     }
 
     public function expire(PaymentIntent $intent, string $source = 'scheduler'): PaymentIntent
