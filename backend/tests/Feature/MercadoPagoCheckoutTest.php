@@ -62,7 +62,7 @@ class MercadoPagoCheckoutTest extends TestCase
             'province' => 'Córdoba',
         ])->assertCreated()
             ->assertJsonPath('data.orders_count', 2)
-            ->assertJsonPath('data.checkout_url', 'https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_test_123')
+            ->assertJsonPath('data.checkout_url', 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_test_123')
             ->assertJsonPath('data.payment_intent.status', 'pending')
             ->assertJsonPath('data.payment_intent.provider', 'mercado_pago');
 
@@ -163,7 +163,7 @@ class MercadoPagoCheckoutTest extends TestCase
             ->assertJsonPath('data.orders_count', 1)
             ->assertJsonPath('data.payment_intent.mode', 'sandbox')
             ->assertJsonPath('data.payment_intent.amount_cents', 10000)
-            ->assertJsonPath('data.checkout_url', 'https://sandbox.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_test_123');
+            ->assertJsonPath('data.checkout_url', 'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref_test_123');
 
         $this->assertDatabaseHas('orders', [
             'id' => $response->json('data.orders.0.id'),

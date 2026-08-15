@@ -450,9 +450,9 @@ class MercadoPagoCheckoutService
     public function responseData(PaymentIntent $intent): array
     {
         $intent->load('orders.items.product.producerProfile');
-        $checkoutUrl = $intent->mode === 'sandbox'
-            ? ($intent->sandbox_checkout_url ?: $intent->checkout_url)
-            : $intent->checkout_url;
+        // Test users work through Checkout Pro's regular init point. The legacy
+        // sandbox login URL can loop during the first test-account sign-in.
+        $checkoutUrl = $intent->checkout_url ?: $intent->sandbox_checkout_url;
 
         return [
             'payment_intent' => [
