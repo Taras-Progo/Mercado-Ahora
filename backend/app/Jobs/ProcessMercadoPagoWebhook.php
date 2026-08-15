@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Contracts\PaymentGateway;
+use App\Exceptions\PaymentResourceNotFoundException;
 use App\Models\PaymentIntent;
 use App\Models\PaymentWebhookEvent;
 use App\Services\Payments\MercadoPagoPaymentProcessor;
@@ -50,6 +51,12 @@ class ProcessMercadoPagoWebhook implements ShouldQueue
             }
             $processor->processProviderPayment($payment, 'webhook');
             $event->update(['status' => 'processed', 'processed_at' => now(), 'processing_error' => null]);
+        } catch (PaymentResourceNotFoundException $exception) {
+            $event->update([
+                'status' => 'ignored',
+                'processed_at' => now(),
+                'processing_error' => 'Mercado Pago no encontró el recurso. Puede tratarse de una notificación simulada.',
+            ]);
         } catch (Throwable $exception) {
             $event->update([
                 'status' => 'failed',

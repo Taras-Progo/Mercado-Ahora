@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PaymentIntent;
 use App\Models\Product;
 use App\Services\Payments\MercadoPagoCheckoutService;
+use App\Services\Payments\MercadoPagoPaymentReconciler;
 use App\Services\Payments\PaymentSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,13 +55,28 @@ class MercadoPagoCheckoutController extends Controller
         return response()->json(['data' => $checkout->start($request->user(), $cart, $data)], 201);
     }
 
-    public function show(Request $request, string $reference, PaymentSummaryService $summary): JsonResponse
+    public function show(
+        Request $request,
+        string $reference,
+        PaymentSummaryService $summary,
+        MercadoPagoPaymentReconciler $reconciler,
+    ): JsonResponse
     {
         $intent = PaymentIntent::query()
             ->with('orders:id,order_number,status,payment_status,total_cents')
             ->where('internal_reference', $reference)
             ->where('buyer_id', $request->user()->id)
             ->firstOrFail();
+
+        if ($reconciler->shouldSync($intent)) {
+            try {
+                $intent = $reconciler->sync($intent, 'buyer_status_poll')->load(
+                    'orders:id,order_number,status,payment_status,total_cents',
+                );
+            } catch (\Throwable $exception) {
+                report($exception);
+            }
+        }
 
         return response()->json([
             'data' => [

@@ -107,6 +107,69 @@ class MercadoPagoLifecycleTest extends TestCase
         $this->assertSame(3, $products[1]->fresh()->stock);
     }
 
+    public function test_simulated_webhook_with_fake_payment_is_ignored_without_retries(): void
+    {
+        Http::fake([
+            'https://api.mercadopago.com/v1/payments/123456' => Http::response([], 404),
+        ]);
+        $event = PaymentWebhookEvent::query()->create([
+            'provider' => 'mercado_pago',
+            'event_type' => 'payment',
+            'external_id' => 'simulated-event',
+            'request_id' => 'simulated-request',
+            'resource_id' => '123456',
+            'signature_valid' => true,
+            'payload' => ['resource_id' => '123456'],
+            'status' => 'received',
+        ]);
+
+        (new ProcessMercadoPagoWebhook($event->id))->handle(
+            app(PaymentGateway::class),
+            app(MercadoPagoPaymentProcessor::class),
+        );
+
+        $this->assertSame('ignored', $event->fresh()->status);
+        $this->assertSame(1, $event->fresh()->attempts);
+        $this->assertNotNull($event->fresh()->processed_at);
+    }
+
+    public function test_buyer_status_poll_reconciles_sandbox_payment_without_webhook(): void
+    {
+        Notification::fake();
+        [$buyer, , $intent, $products] = $this->checkoutWithTwoProducers();
+        $payment = $this->providerPayment($intent, 'approved', 'payment-poll-1');
+        Http::fake([
+            'https://api.mercadopago.com/v1/payments/search*' => Http::response(['results' => [$payment]]),
+        ]);
+
+        Sanctum::actingAs($buyer);
+        $this->getJson('/api/v1/payments/intents/'.$intent->internal_reference)
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved')
+            ->assertJsonPath('data.orders.0.payment_status', 'approved');
+
+        $this->assertSame('approved', $intent->fresh()->status);
+        $this->assertSame(8, $products[0]->fresh()->stock);
+        $this->assertSame(3, $products[1]->fresh()->stock);
+        Http::assertSent(fn (ClientRequest $request) => $request->method() === 'GET'
+            && str_contains($request->url(), '/v1/payments/search')
+            && str_contains($request->url(), rawurlencode($intent->internal_reference)));
+    }
+
+    public function test_scheduled_reconciliation_updates_pending_sandbox_payment(): void
+    {
+        Notification::fake();
+        [, , $intent] = $this->checkoutWithTwoProducers();
+        $payment = $this->providerPayment($intent, 'approved', 'payment-scheduled-1');
+        Http::fake([
+            'https://api.mercadopago.com/v1/payments/search*' => Http::response(['results' => [$payment]]),
+        ]);
+
+        $this->artisan('payments:sync-mercado-pago')->assertSuccessful();
+
+        $this->assertSame('approved', $intent->fresh()->status);
+    }
+
     public function test_expiration_command_processes_delayed_approval_before_releasing_stock(): void
     {
         Notification::fake();

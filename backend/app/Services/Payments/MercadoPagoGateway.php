@@ -4,6 +4,7 @@ namespace App\Services\Payments;
 
 use App\Contracts\PaymentGateway;
 use App\Exceptions\PaymentGatewayException;
+use App\Exceptions\PaymentResourceNotFoundException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
@@ -67,6 +68,10 @@ class MercadoPagoGateway implements PaymentGateway
                 ->get($path, $query);
         } catch (ConnectionException $exception) {
             throw new PaymentGatewayException('No pudimos conectar con Mercado Pago. Intentá nuevamente.', 0, $exception);
+        }
+
+        if ($response->notFound()) {
+            throw new PaymentResourceNotFoundException('Mercado Pago no encontró el recurso solicitado.');
         }
 
         if (! $response->successful() || ! is_array($response->json())) {
