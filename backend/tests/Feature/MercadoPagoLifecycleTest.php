@@ -310,7 +310,7 @@ class MercadoPagoLifecycleTest extends TestCase
         $this->assertSame(4, $products[1]->fresh()->stock);
     }
 
-    public function test_late_approval_after_release_requires_review_when_stock_is_not_reserved(): void
+    public function test_late_approval_after_release_consumes_stock_when_it_is_still_available(): void
     {
         [, , $intent, $products] = $this->checkoutWithTwoProducers();
         $processor = app(MercadoPagoPaymentProcessor::class);
@@ -318,8 +318,23 @@ class MercadoPagoLifecycleTest extends TestCase
 
         $processor->processProviderPayment($this->providerPayment($intent, 'approved', 'payment-late-1'));
 
+        $this->assertSame('approved', $intent->fresh()->status);
+        $this->assertSame(8, $products[0]->fresh()->stock);
+        $this->assertSame(3, $products[1]->fresh()->stock);
+        $this->assertSame(2, $intent->orders()->where('orders.status', 'confirmed')->count());
+    }
+
+    public function test_late_approval_after_release_requires_review_when_stock_is_no_longer_available(): void
+    {
+        [, , $intent, $products] = $this->checkoutWithTwoProducers();
+        $processor = app(MercadoPagoPaymentProcessor::class);
+        $processor->expire($intent);
+        $products[0]->update(['stock' => 1]);
+
+        $processor->processProviderPayment($this->providerPayment($intent, 'approved', 'payment-late-no-stock-1'));
+
         $this->assertSame('requires_review', $intent->fresh()->status);
-        $this->assertSame(10, $products[0]->fresh()->stock);
+        $this->assertSame(1, $products[0]->fresh()->stock);
         $this->assertSame(4, $products[1]->fresh()->stock);
     }
 
@@ -338,11 +353,16 @@ class MercadoPagoLifecycleTest extends TestCase
             ->assertJsonCount(2, 'data.orders');
 
         $orderCount = $intent->orders()->count();
-        $this->postJson('/api/v1/payments/intents/'.$intent->internal_reference.'/retry', [
-            'idempotency_key' => (string) Str::uuid(),
+        $retryKey = (string) Str::uuid();
+        $firstRetry = $this->postJson('/api/v1/payments/intents/'.$intent->internal_reference.'/retry', [
+            'idempotency_key' => $retryKey,
         ])->assertCreated()
             ->assertJsonPath('data.payment_intent.status', 'pending');
+        $secondRetry = $this->postJson('/api/v1/payments/intents/'.$intent->internal_reference.'/retry', [
+            'idempotency_key' => $retryKey,
+        ])->assertCreated();
 
+        $this->assertSame($firstRetry->json('data.payment_intent.id'), $secondRetry->json('data.payment_intent.id'));
         $this->assertDatabaseCount('orders', $orderCount);
         $this->assertDatabaseCount('payment_intents', 2);
         $this->assertSame(3, StockReservation::query()->where('status', 'active')->sum('quantity'));
@@ -368,7 +388,7 @@ class MercadoPagoLifecycleTest extends TestCase
         Sanctum::actingAs($buyer);
         $this->postJson('/api/v1/cart/items', ['product_id' => $firstProduct->id, 'quantity' => 2])->assertCreated();
         $this->postJson('/api/v1/cart/items', ['product_id' => $secondProduct->id, 'quantity' => 1])->assertCreated();
-        $response = $this->postJson('/api/v1/checkout/mercado-pago', ['idempotency_key' => (string) Str::uuid()])->assertCreated();
+        $response = $this->postJson('/api/v1/checkout/mercado-pago', ['idempotency_key' => (string) Str::uuid(), 'delivery_type' => 'local'])->assertCreated();
 
         return [$buyer, $firstSeller, PaymentIntent::query()->findOrFail($response->json('data.payment_intent.id')), [$firstProduct, $secondProduct]];
     }

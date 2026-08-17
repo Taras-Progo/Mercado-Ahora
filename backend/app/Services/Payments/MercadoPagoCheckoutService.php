@@ -24,19 +24,9 @@ class MercadoPagoCheckoutService
     public function start(User $buyer, Cart $cart, array $data): array
     {
         $idempotencyKey = $data['idempotency_key'];
-        $existing = PaymentIntent::query()
-            ->where('buyer_id', $buyer->id)
-            ->where('idempotency_key', $idempotencyKey)
-            ->first();
-
+        $existing = $this->findExistingIntent($buyer, $idempotencyKey);
         if ($existing) {
-            if (in_array($existing->status, ['pending', 'preference_created'], true)) {
-                return $this->responseData($existing);
-            }
-
-            throw new HttpResponseException(response()->json([
-                'message' => 'Este intento de pago ya fue utilizado. Generá un nuevo intento para continuar.',
-            ], 409));
+            return $this->resumeExistingIntent($existing, $idempotencyKey, $cart);
         }
 
         $expiresAt = now()->addMinutes((int) config('services.mercado_pago.reservation_minutes', 30));
@@ -49,19 +39,9 @@ class MercadoPagoCheckoutService
     public function startBuyNow(User $buyer, Product $product, int $quantity, array $data): array
     {
         $idempotencyKey = $data['idempotency_key'];
-        $existing = PaymentIntent::query()
-            ->where('buyer_id', $buyer->id)
-            ->where('idempotency_key', $idempotencyKey)
-            ->first();
-
+        $existing = $this->findExistingIntent($buyer, $idempotencyKey);
         if ($existing) {
-            if (in_array($existing->status, ['pending', 'preference_created'], true)) {
-                return $this->responseData($existing);
-            }
-
-            throw new HttpResponseException(response()->json([
-                'message' => 'Este intento de pago ya fue utilizado. Genera un nuevo intento para continuar.',
-            ], 409));
+            return $this->resumeExistingIntent($existing, $idempotencyKey);
         }
 
         $expiresAt = now()->addMinutes((int) config('services.mercado_pago.reservation_minutes', 30));
@@ -83,6 +63,20 @@ class MercadoPagoCheckoutService
             throw new HttpResponseException(response()->json([
                 'message' => 'Este pago no admite un nuevo intento.',
             ], 422));
+        }
+
+        $existing = $this->findExistingIntent($buyer, $idempotencyKey);
+        if ($existing) {
+            $failedOrderIds = $failedIntent->orders()->pluck('orders.id')->sort()->values()->all();
+            $existingOrderIds = $existing->orders()->pluck('orders.id')->sort()->values()->all();
+
+            if ($failedOrderIds !== $existingOrderIds) {
+                throw new HttpResponseException(response()->json([
+                    'message' => 'La clave de reintento ya está vinculada con otra compra.',
+                ], 409));
+            }
+
+            return $this->resumeExistingIntent($existing, $idempotencyKey);
         }
 
         $expiresAt = now()->addMinutes((int) config('services.mercado_pago.reservation_minutes', 30));
@@ -175,6 +169,43 @@ class MercadoPagoCheckoutService
         }, 3);
 
         return $this->createPreference($intent, $idempotencyKey);
+    }
+
+    private function findExistingIntent(User $buyer, string $idempotencyKey): ?PaymentIntent
+    {
+        $existing = PaymentIntent::query()->where('idempotency_key', $idempotencyKey)->first();
+
+        if ($existing && $existing->buyer_id !== $buyer->id) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'La clave de pago ya está vinculada con otra cuenta.',
+            ], 409));
+        }
+
+        return $existing;
+    }
+
+    /** @return array<string, mixed> */
+    private function resumeExistingIntent(
+        PaymentIntent $intent,
+        string $idempotencyKey,
+        ?Cart $cart = null,
+    ): array {
+        if (in_array($intent->status, ['pending', 'preference_created'], true)) {
+            return $this->responseData($intent);
+        }
+
+        $hasActiveReservation = $intent->reservations()
+            ->where('status', 'active')
+            ->where('expires_at', '>', now())
+            ->exists();
+
+        if ($intent->status === 'creating' && $hasActiveReservation) {
+            return $this->createPreference($intent, $idempotencyKey, $cart);
+        }
+
+        throw new HttpResponseException(response()->json([
+            'message' => 'Este intento de pago ya fue utilizado. Generá un nuevo intento para continuar.',
+        ], 409));
     }
 
     /** @return array<string, mixed> */

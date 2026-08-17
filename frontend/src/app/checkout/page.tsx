@@ -161,6 +161,19 @@ function CheckoutContent() {
   const handleMercadoPagoCheckout = async () => {
     if (paymentInFlight.current) return;
 
+    if (!deliveryType) {
+      setError("Seleccioná cómo querés recibir los productos.");
+      return;
+    }
+
+    if (
+      ["home_delivery", "pickup_point"].includes(deliveryType) &&
+      (!deliveryAddress.trim() || !city.trim() || !province.trim())
+    ) {
+      setError("Completá la dirección, la ciudad y la provincia antes de pagar.");
+      return;
+    }
+
     paymentInFlight.current = true;
     setSubmitting(true);
     setError("");
@@ -543,7 +556,7 @@ function CheckoutContent() {
                     Datos de entrega
                   </h2>
                   <p className="mt-1 text-xs text-brown-muted">
-                    Completa estos datos para finalizar la compra.
+                    Completá estos datos para finalizar la compra.
                   </p>
 
                   <div className="mt-4 grid gap-4">

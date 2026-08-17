@@ -17,17 +17,16 @@ class MercadoPagoCheckoutController extends Controller
 {
     public function store(Request $request, MercadoPagoCheckoutService $checkout): JsonResponse
     {
-        $isBuyNow = $request->filled('product_id');
         $needsDeliveryAddress = in_array($request->input('delivery_type'), ['home_delivery', 'pickup_point'], true);
 
         $data = $request->validate([
             'idempotency_key' => ['required', 'uuid'],
             'product_id' => ['nullable', 'required_with:quantity', 'integer', 'exists:products,id'],
             'quantity' => ['nullable', 'required_with:product_id', 'integer', 'min:1'],
-            'delivery_type' => [Rule::requiredIf($isBuyNow), 'nullable', Rule::in(['home_delivery', 'pickup_point', 'producer_pickup', 'local'])],
-            'delivery_address' => [Rule::requiredIf($isBuyNow && $needsDeliveryAddress), 'nullable', 'string', 'max:255'],
-            'city' => [Rule::requiredIf($isBuyNow && $needsDeliveryAddress), 'nullable', 'string', 'max:120'],
-            'province' => [Rule::requiredIf($isBuyNow && $needsDeliveryAddress), 'nullable', 'string', 'max:120'],
+            'delivery_type' => ['required', Rule::in(['home_delivery', 'pickup_point', 'producer_pickup', 'local'])],
+            'delivery_address' => [Rule::requiredIf($needsDeliveryAddress), 'nullable', 'string', 'max:255'],
+            'city' => [Rule::requiredIf($needsDeliveryAddress), 'nullable', 'string', 'max:120'],
+            'province' => [Rule::requiredIf($needsDeliveryAddress), 'nullable', 'string', 'max:120'],
             'buyer_note' => ['nullable', 'string', 'max:1000'],
         ], [
             'delivery_type.required' => "Seleccion\u{00e1} c\u{00f3}mo quer\u{00e9}s recibir el producto.",

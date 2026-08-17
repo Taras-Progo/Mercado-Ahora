@@ -99,7 +99,7 @@ class MercadoPagoCheckoutTest extends TestCase
         Sanctum::actingAs($buyer);
         $this->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])->assertCreated();
 
-        $payload = ['idempotency_key' => (string) Str::uuid()];
+        $payload = ['idempotency_key' => (string) Str::uuid(), 'delivery_type' => 'local'];
         $first = $this->postJson('/api/v1/checkout/mercado-pago', $payload)->assertCreated();
         $second = $this->postJson('/api/v1/checkout/mercado-pago', $payload)->assertCreated();
 
@@ -117,12 +117,12 @@ class MercadoPagoCheckoutTest extends TestCase
         $firstBuyer = $this->buyer('first@example.com');
         Sanctum::actingAs($firstBuyer);
         $this->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])->assertCreated();
-        $this->postJson('/api/v1/checkout/mercado-pago', ['idempotency_key' => (string) Str::uuid()])->assertCreated();
+        $this->postJson('/api/v1/checkout/mercado-pago', ['idempotency_key' => (string) Str::uuid(), 'delivery_type' => 'local'])->assertCreated();
 
         $secondBuyer = $this->buyer('second@example.com');
         Sanctum::actingAs($secondBuyer);
         $this->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])->assertCreated();
-        $this->postJson('/api/v1/checkout/mercado-pago', ['idempotency_key' => (string) Str::uuid()])
+        $this->postJson('/api/v1/checkout/mercado-pago', ['idempotency_key' => (string) Str::uuid(), 'delivery_type' => 'local'])
             ->assertStatus(422)
             ->assertJsonPath('conflicts.0.product_id', $product->id)
             ->assertJsonPath('conflicts.0.available_stock', 0)
@@ -137,7 +137,7 @@ class MercadoPagoCheckoutTest extends TestCase
         $this->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])->assertCreated();
         $product->update(['price_cents' => 7500]);
 
-        $this->postJson('/api/v1/checkout/mercado-pago', ['idempotency_key' => (string) Str::uuid()])
+        $this->postJson('/api/v1/checkout/mercado-pago', ['idempotency_key' => (string) Str::uuid(), 'delivery_type' => 'local'])
             ->assertCreated()
             ->assertJsonPath('data.payment_intent.amount_cents', 7500);
 
@@ -239,6 +239,59 @@ class MercadoPagoCheckoutTest extends TestCase
         $this->assertDatabaseCount('stock_reservations', 0);
         Http::assertNothingSent();
     }
+    public function test_cart_checkout_requires_delivery_information_before_creating_payment(): void
+    {
+        $buyer = $this->buyer();
+        $product = $this->product('Miel', 5000, 3, 'La Colmena');
+        Sanctum::actingAs($buyer);
+        $this->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])->assertCreated();
+
+        $this->postJson('/api/v1/checkout/mercado-pago', [
+            'idempotency_key' => (string) Str::uuid(),
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['delivery_type']);
+
+        $this->postJson('/api/v1/checkout/mercado-pago', [
+            'idempotency_key' => (string) Str::uuid(),
+            'delivery_type' => 'home_delivery',
+        ])->assertStatus(422)
+            ->assertJsonValidationErrors(['delivery_address', 'city', 'province']);
+
+        $this->assertDatabaseCount('orders', 0);
+        $this->assertDatabaseCount('payment_intents', 0);
+        Http::assertNothingSent();
+    }
+
+    public function test_interrupted_creating_intent_resumes_preference_without_duplicate_orders(): void
+    {
+        $buyer = $this->buyer();
+        $product = $this->product('Miel', 5000, 3, 'La Colmena');
+        Sanctum::actingAs($buyer);
+        $this->postJson('/api/v1/cart/items', ['product_id' => $product->id, 'quantity' => 1])->assertCreated();
+
+        $payload = [
+            'idempotency_key' => (string) Str::uuid(),
+            'delivery_type' => 'local',
+        ];
+        $first = $this->postJson('/api/v1/checkout/mercado-pago', $payload)->assertCreated();
+        $intent = PaymentIntent::query()->findOrFail($first->json('data.payment_intent.id'));
+        $intent->update([
+            'status' => 'creating',
+            'external_id' => null,
+            'preference_id' => null,
+            'checkout_url' => null,
+            'sandbox_checkout_url' => null,
+        ]);
+
+        $second = $this->postJson('/api/v1/checkout/mercado-pago', $payload)->assertCreated();
+
+        $this->assertSame($intent->id, $second->json('data.payment_intent.id'));
+        $this->assertDatabaseCount('orders', 1);
+        $this->assertDatabaseCount('payment_intents', 1);
+        $this->assertDatabaseCount('stock_reservations', 1);
+        Http::assertSentCount(2);
+    }
+
     private function buyer(string $email = 'buyer@example.com'): User
     {
         return User::factory()->create(['email' => $email, 'role' => 'buyer', 'status' => 'active']);

@@ -185,16 +185,25 @@ class MercadoPagoPaymentProcessor
             ->get();
 
         if ($reservations->isEmpty()) {
-            return $this->markForReview(
-                $intent,
-                (string) $payment['id'],
-                (string) $payment['status'],
-                'El pago llegó después de que la reserva fuera liberada.',
-                $source,
-            );
-        }
+            $requiredByProduct = $intent->orders()
+                ->with('items')
+                ->get()
+                ->flatMap->items
+                ->groupBy('product_id')
+                ->map->sum('quantity');
 
-        $requiredByProduct = $reservations->groupBy('product_id')->map->sum('quantity');
+            if ($requiredByProduct->isEmpty()) {
+                return $this->markForReview(
+                    $intent,
+                    (string) $payment['id'],
+                    (string) $payment['status'],
+                    'El pago fue aprobado, pero no encontramos los productos vinculados.',
+                    $source,
+                );
+            }
+        } else {
+            $requiredByProduct = $reservations->groupBy('product_id')->map->sum('quantity');
+        }
         $products = Product::query()->whereIn('id', $requiredByProduct->keys())->orderBy('id')->lockForUpdate()->get()->keyBy('id');
 
         foreach ($requiredByProduct as $productId => $quantity) {
