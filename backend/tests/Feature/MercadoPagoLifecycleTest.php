@@ -208,6 +208,19 @@ class MercadoPagoLifecycleTest extends TestCase
         $this->assertSame(4, $products[1]->fresh()->stock);
         $this->assertSame(3, StockReservation::query()->where('status', 'released')->sum('quantity'));
     }
+
+    public function test_expired_payment_email_identifies_the_products_in_the_purchase(): void
+    {
+        [$buyer, , $intent] = $this->checkoutWithTwoProducers();
+
+        $mail = (new PaymentStatusNotification($intent->id, 'expired'))->toMail($buyer);
+        $html = (string) $mail->render();
+
+        $this->assertSame('Pago vencido en Mercado Ahora', $mail->subject);
+        $this->assertStringContainsString('Productos: Miel (2), Jabón natural.', $html);
+        $this->assertStringContainsString('Importe:', $html);
+    }
+
     public function test_approved_payment_consumes_stock_once_and_confirms_all_orders(): void
     {
         Notification::fake();

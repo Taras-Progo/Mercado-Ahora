@@ -17,7 +17,10 @@ class PaymentStatusNotification extends Notification implements ShouldQueue
         $this->afterCommit();
     }
 
-    public function via(object $notifiable): array { return ['mail', 'database']; }
+    public function via(object $notifiable): array
+    {
+        return ['mail', 'database'];
+    }
 
     public function toArray(object $notifiable): array
     {
@@ -41,9 +44,12 @@ class PaymentStatusNotification extends Notification implements ShouldQueue
             'payment_status' => $this->status,
         ];
     }
+
     public function toMail(object $notifiable): MailMessage
     {
-        $intent = PaymentIntent::query()->with('orders')->findOrFail($this->paymentIntentId);
+        $intent = PaymentIntent::query()
+            ->with('orders.items:id,order_id,product_name,quantity')
+            ->findOrFail($this->paymentIntentId);
         $frontend = rtrim((string) config('app.frontend_url', config('app.url')), '/');
         $copy = match ($this->status) {
             'approved' => ['Pago aprobado', 'Tu pago fue confirmado', 'Mercado Pago confirmó tu compra. Los productores ya pueden preparar tu pedido.'],
@@ -53,6 +59,15 @@ class PaymentStatusNotification extends Notification implements ShouldQueue
             default => ['Pago vencido', 'La reserva de pago venció', 'La reserva venció antes de confirmarse. Podés volver a intentar la compra si todavía hay stock.'],
         };
 
+        $intro = [$copy[2]];
+        $purchaseSummary = $this->purchaseSummary($intent);
+
+        if ($purchaseSummary !== null) {
+            $intro[] = $purchaseSummary;
+        }
+
+        $intro[] = 'Importe: $ '.number_format($intent->amount_cents / 100, 2, ',', '.').'.';
+
         return (new MailMessage)
             ->subject($copy[0].' en Mercado Ahora')
             ->view(['html' => 'emails.auth-action', 'text' => 'emails.auth-action-text'], [
@@ -60,11 +75,32 @@ class PaymentStatusNotification extends Notification implements ShouldQueue
                 'eyebrow' => 'Estado del pago',
                 'title' => $copy[1],
                 'greeting' => 'Hola, '.$notifiable->name,
-                'intro' => [$copy[2], 'Importe: $ '.number_format($intent->amount_cents / 100, 2, ',', '.').'.'],
+                'intro' => $intro,
                 'actionLabel' => 'Ver mis pedidos',
                 'actionUrl' => $frontend.'/orders',
                 'note' => 'Referencia de pago: '.$intent->internal_reference,
                 'fallbackLabel' => 'Si el botón no abre correctamente, copiá y pegá este enlace en tu navegador:',
             ]);
+    }
+
+    private function purchaseSummary(PaymentIntent $intent): ?string
+    {
+        $products = $intent->orders
+            ->flatMap->items
+            ->groupBy('product_name')
+            ->map(function ($items, string $productName): string {
+                $quantity = (int) $items->sum('quantity');
+
+                return $quantity > 1 ? $productName.' ('.$quantity.')' : $productName;
+            })
+            ->values();
+
+        if ($products->isEmpty()) {
+            return null;
+        }
+
+        $label = $products->count() === 1 ? 'Producto' : 'Productos';
+
+        return $label.': '.$products->implode(', ').'.';
     }
 }
