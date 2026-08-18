@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\PaymentIntent;
 use App\Models\Product;
 use App\Models\ReturnRequest;
+use App\Notifications\MarketplaceInAppNotification;
 use App\Services\Payments\PaymentSummaryService;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -100,7 +101,7 @@ class OrderController extends Controller
     public function buyerOrders(Request $request, PaymentSummaryService $payments): JsonResponse
     {
         $orders = $request->user()->orders()
-            ->with('items.product.producerProfile', 'statusHistory', 'returnRequests', 'paymentIntents')
+            ->with('items.product.producerProfile', 'statusHistory', 'returnRequests.statusHistory.changedBy', 'paymentIntents')
             ->latest()
             ->get();
 
@@ -110,7 +111,7 @@ class OrderController extends Controller
     public function show(Request $request, int $id, PaymentSummaryService $payments): JsonResponse
     {
         $order = Order::query()
-            ->with('items.product.producerProfile', 'statusHistory', 'returnRequests', 'paymentIntents')
+            ->with('items.product.producerProfile', 'statusHistory', 'returnRequests.statusHistory.changedBy', 'paymentIntents')
             ->findOrFail($id);
 
         if (! $request->user()->isAdmin() && $order->buyer_id !== $request->user()->id) {
@@ -133,7 +134,7 @@ class OrderController extends Controller
     {
         $profile = $request->user()->producerProfile ?? abort(422, 'Perfil de productor requerido.');
         $orders = Order::query()
-            ->with('buyer', 'items.product', 'returnRequests', 'paymentIntents')
+            ->with('buyer', 'items.product', 'returnRequests.statusHistory.changedBy', 'paymentIntents')
             ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
             ->latest()
             ->get();
@@ -145,7 +146,7 @@ class OrderController extends Controller
     {
         $profile = $request->user()->producerProfile ?? abort(422, 'Perfil de productor requerido.');
         $order = Order::query()
-            ->with('items.product', 'buyer', 'statusHistory', 'returnRequests', 'paymentIntents')
+            ->with('items.product', 'buyer', 'statusHistory', 'returnRequests.statusHistory.changedBy', 'paymentIntents')
             ->whereHas('items', fn ($query) => $query->where('producer_profile_id', $profile->id))
             ->findOrFail($id);
         $order->setAttribute('payment_summary', $payments->forOrder($order));
@@ -216,11 +217,48 @@ class OrderController extends Controller
         ], $conversation->wasRecentlyCreated ? 201 : 200);
     }
 
+    public function buyerOrderConversation(Request $request, int $id): JsonResponse
+    {
+        $order = Order::query()
+            ->with(['items.product.producerProfile.user', 'buyer'])
+            ->findOrFail($id);
+
+        abort_if($order->buyer_id !== $request->user()->id, 403, 'No tenés permiso para acceder a este pedido.');
+        $firstItem = $order->items->first();
+        $profile = $firstItem?->product?->producerProfile;
+
+        if (! $profile) {
+            abort(422, 'No pudimos identificar al productor de este pedido.');
+        }
+
+        $conversation = Conversation::query()->firstOrCreate(
+            ['order_id' => $order->id],
+            [
+                'buyer_id' => $order->buyer_id,
+                'producer_profile_id' => $profile->id,
+                'product_id' => $firstItem?->product_id,
+                'status' => 'open',
+                'last_message_at' => now(),
+            ],
+        );
+
+        if ($conversation->wasRecentlyCreated) {
+            $conversation->messages()->create([
+                'sender_id' => $request->user()->id,
+                'body' => "Hola, te escribo por el pedido {$order->order_number}.",
+            ]);
+            $conversation->update(['last_message_at' => now()]);
+        }
+
+        return response()->json([
+            'data' => $conversation->load('buyer', 'producerProfile.user', 'product', 'order', 'messages.sender'),
+        ], $conversation->wasRecentlyCreated ? 201 : 200);
+    }
     public function returns(Request $request): JsonResponse
     {
         return response()->json([
             'data' => ReturnRequest::query()
-                ->with('order.items.product', 'buyer')
+                ->with('order.items.product.producerProfile', 'buyer', 'statusHistory.changedBy')
                 ->where('buyer_id', $request->user()->id)
                 ->latest()
                 ->get(),
@@ -233,7 +271,7 @@ class OrderController extends Controller
 
         return response()->json([
             'data' => ReturnRequest::query()
-                ->with('buyer', 'order.items.product', 'order.statusHistory')
+                ->with('buyer', 'order.items.product', 'order.statusHistory', 'statusHistory.changedBy')
                 ->whereHas('order.items', fn ($query) => $query->where('producer_profile_id', $profile->id))
                 ->latest()
                 ->get(),
@@ -242,30 +280,110 @@ class OrderController extends Controller
 
     public function requestReturn(Request $request, int $orderId): JsonResponse
     {
-        $order = $request->user()->orders()->with('returnRequests')->findOrFail($orderId);
         $data = $request->validate([
             'reason' => ['required', 'string', 'max:255'],
             'details' => ['nullable', 'string'],
         ]);
 
-        if ($order->status !== 'delivered') {
-            abort(422, 'Solo se puede solicitar una devolución de pedidos entregados.');
-        }
+        $return = DB::transaction(function () use ($request, $orderId, $data) {
+            $order = $request->user()->orders()
+                ->with(['returnRequests', 'items.producerProfile.user'])
+                ->lockForUpdate()
+                ->findOrFail($orderId);
 
-        if ($order->returnRequests()->exists()) {
-            abort(422, 'Ya existe una solicitud de devolución para este pedido.');
-        }
+            if ($order->status !== 'delivered') {
+                abort(422, 'Solo se puede solicitar una devolución de pedidos entregados.');
+            }
 
-        $return = ReturnRequest::query()->create([
-            ...$data,
-            'order_id' => $order->id,
-            'buyer_id' => $request->user()->id,
-            'status' => 'open',
-        ]);
+            if ($order->returnRequests()->exists()) {
+                abort(422, 'Ya existe una solicitud de devolución para este pedido.');
+            }
 
-        return response()->json(['data' => $return->load('order.items.product', 'buyer')], 201);
+            $return = ReturnRequest::query()->create([
+                ...$data,
+                'order_id' => $order->id,
+                'buyer_id' => $request->user()->id,
+                'status' => 'open',
+            ]);
+            $return->statusHistory()->create([
+                'changed_by' => $request->user()->id,
+                'status' => 'open',
+                'note' => $data['details'] ?? 'Solicitud creada por el comprador.',
+            ]);
+
+            $producerUsers = $order->items
+                ->map(fn ($item) => $item->producerProfile?->user)
+                ->filter()
+                ->unique('id');
+
+            DB::afterCommit(function () use ($producerUsers, $return, $order) {
+                foreach ($producerUsers as $producer) {
+                    $producer->notify(new MarketplaceInAppNotification(
+                        'return_requested',
+                        'Nueva solicitud de devolución',
+                        'El comprador solicitó una devolución para el pedido '.$order->order_number.'.',
+                        '/seller/returns?return='.$return->id,
+                        ['return_id' => $return->id, 'order_id' => $order->id],
+                    ));
+                }
+            });
+
+            return $return;
+        });
+
+        return response()->json([
+            'data' => $return->load('order.items.product.producerProfile', 'buyer', 'statusHistory.changedBy'),
+        ], 201);
     }
 
+    public function updateSellerReturnStatus(Request $request, int $id): JsonResponse
+    {
+        $profile = $request->user()->producerProfile ?? abort(422, 'Perfil de productor requerido.');
+        $data = $request->validate([
+            'status' => ['required', 'string', Rule::in(['approved', 'rejected'])],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $return = DB::transaction(function () use ($request, $profile, $id, $data) {
+            $return = ReturnRequest::query()
+                ->with(['buyer', 'order.items'])
+                ->whereHas('order.items', fn ($query) => $query->where('producer_profile_id', $profile->id))
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($return->status !== 'open') {
+                abort(422, 'Esta devolución ya fue revisada y no puede volver a modificarse.');
+            }
+
+            $return->update(['status' => $data['status']]);
+            $return->statusHistory()->create([
+                'changed_by' => $request->user()->id,
+                'status' => $data['status'],
+                'note' => $data['note'] ?? null,
+            ]);
+
+            $title = $data['status'] === 'approved'
+                ? 'Tu devolución fue aceptada'
+                : 'Tu devolución fue rechazada';
+            $message = $data['status'] === 'approved'
+                ? 'El vendedor aceptó la solicitud. Administración supervisará el cierre.'
+                : 'El vendedor rechazó la solicitud. Podés consultar el detalle y su comentario.';
+
+            DB::afterCommit(fn () => $return->buyer->notify(new MarketplaceInAppNotification(
+                'return_'.$data['status'],
+                $title,
+                $message,
+                '/returns?return='.$return->id,
+                ['return_id' => $return->id, 'order_id' => $return->order_id],
+            )));
+
+            return $return;
+        });
+
+        return response()->json([
+            'data' => $return->load('buyer', 'order.items.product', 'order.statusHistory', 'statusHistory.changedBy'),
+        ]);
+    }
     public function createPaymentIntent(Request $request, int $orderId): JsonResponse
     {
         $order = $request->user()->orders()->findOrFail($orderId);

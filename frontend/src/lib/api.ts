@@ -263,6 +263,27 @@ export type ConversationSummary = {
   conversations: Conversation[];
 };
 
+export type AppNotification = {
+  id: string;
+  type: string;
+  data: {
+    kind?: string;
+    title: string;
+    message: string;
+    url?: string;
+    order_id?: number;
+    return_id?: number;
+    [key: string]: unknown;
+  };
+  read_at?: string | null;
+  created_at: string;
+};
+
+export type NotificationSummary = {
+  unread_count: number;
+  notifications: AppNotification[];
+};
+
 export type Message = {
   id: number;
   conversation_id: number;
@@ -765,11 +786,7 @@ export async function checkoutCart(data: {
 // ---- Orders API ----
 
 export async function getOrders(): Promise<Order[]> {
-  try {
-    return await apiAuthGet<Order[]>("/orders");
-  } catch {
-    return [];
-  }
+  return apiAuthGet<Order[]>("/orders");
 }
 
 export async function getOrder(id: number): Promise<Order> {
@@ -869,11 +886,7 @@ export async function saveSellerSocialLink(payload: {
 // ---- Seller Orders API ----
 
 export async function getSellerOrders(): Promise<Order[]> {
-  try {
-    return await apiAuthGet<Order[]>("/seller/orders");
-  } catch {
-    return [];
-  }
+  return apiAuthGet<Order[]>("/seller/orders");
 }
 
 export async function getSellerOrder(id: number): Promise<Order> {
@@ -886,6 +899,10 @@ export async function updateSellerOrderStatus(id: number, status: string, note?:
 
 export async function createSellerOrderConversation(id: number): Promise<Conversation> {
   return apiAuthPost<Conversation>(`/seller/orders/${id}/conversation`, {});
+}
+
+export async function createBuyerOrderConversation(id: number): Promise<Conversation> {
+  return apiAuthPost<Conversation>(`/orders/${id}/conversation`, {});
 }
 
 export const SELLER_ORDER_STATUSES = [
@@ -907,6 +924,21 @@ export async function getConversations(): Promise<Conversation[]> {
   }
 }
 
+export async function getNotificationSummary(limit = 4): Promise<NotificationSummary> {
+  return apiAuthGet<NotificationSummary>(`/notifications/summary?limit=${limit}`);
+}
+
+export async function getNotifications(): Promise<AppNotification[]> {
+  return apiAuthGet<AppNotification[]>("/notifications");
+}
+
+export async function markNotificationRead(id: string): Promise<AppNotification> {
+  return apiAuthPatch<AppNotification>(`/notifications/${id}/read`, {});
+}
+
+export async function markAllNotificationsRead(): Promise<{ unread_count: number }> {
+  return apiAuthPatch<{ unread_count: number }>("/notifications/read-all", {});
+}
 export async function getConversationSummary(limit = 4): Promise<ConversationSummary> {
   try {
     return await apiAuthGet<ConversationSummary>(`/conversations/summary?limit=${limit}`);
@@ -941,6 +973,14 @@ export async function sendMessage(conversationId: number, body: string): Promise
 
 // ---- Admin API ----
 
+export type ReturnStatusHistory = {
+  id: number;
+  status: string;
+  note?: string | null;
+  created_at: string;
+  changed_by?: { id: number; name: string; email?: string } | null;
+};
+
 export type ReturnRequest = {
   id: number;
   order_id: number;
@@ -951,6 +991,7 @@ export type ReturnRequest = {
   created_at?: string;
   order?: Order;
   buyer?: { id: number; name: string; email?: string };
+  status_history?: ReturnStatusHistory[];
 };
 
 export type AdminUser = {
@@ -1098,8 +1139,8 @@ export async function getAdminReturns(): Promise<ReturnRequest[]> {
   }
 }
 
-export async function updateAdminReturnStatus(id: number, status: string): Promise<ReturnRequest> {
-  return apiAuthPatch<ReturnRequest>(`/admin/returns/${id}/status`, { status });
+export async function updateAdminReturnStatus(id: number, status: string, note?: string): Promise<ReturnRequest> {
+  return apiAuthPatch<ReturnRequest>(`/admin/returns/${id}/status`, { status, note });
 }
 
 export async function requestReturn(orderId: number, payload: { reason: string; details?: string }): Promise<ReturnRequest> {
@@ -1107,19 +1148,19 @@ export async function requestReturn(orderId: number, payload: { reason: string; 
 }
 
 export async function getReturns(): Promise<ReturnRequest[]> {
-  try {
-    return await apiAuthGet<ReturnRequest[]>("/returns");
-  } catch {
-    return [];
-  }
+  return apiAuthGet<ReturnRequest[]>("/returns");
 }
 
 export async function getSellerReturns(): Promise<ReturnRequest[]> {
-  try {
-    return await apiAuthGet<ReturnRequest[]>("/seller/returns");
-  } catch {
-    return [];
-  }
+  return apiAuthGet<ReturnRequest[]>("/seller/returns");
+}
+
+export async function updateSellerReturnStatus(
+  id: number,
+  status: "approved" | "rejected",
+  note?: string,
+): Promise<ReturnRequest> {
+  return apiAuthPatch<ReturnRequest>(`/seller/returns/${id}/status`, { status, note });
 }
 
 export function orderStatusLabel(status?: string): string {

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CatalogController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\MercadoPagoCheckoutController;
+use App\Http\Controllers\Api\NotificationController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\PaymentWebhookController;
 use App\Http\Controllers\Api\ProductImageController;
@@ -45,6 +46,11 @@ Route::prefix('v1')->group(function () {
 
         Route::get('/users/me', [AuthController::class, 'me']);
 
+        Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::get('/notifications/summary', [NotificationController::class, 'summary']);
+        Route::patch('/notifications/read-all', [NotificationController::class, 'readAll']);
+        Route::patch('/notifications/{id}/read', [NotificationController::class, 'read']);
+
         // Any authenticated buyer (or previously rejected seller) can apply to
         // become a producer with their existing account â€” no second email needed.
         Route::post('/seller/apply', [SellerController::class, 'apply']);
@@ -67,6 +73,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/orders/{id}', [OrderController::class, 'show']);
             Route::get('/orders/{id}/tracking', [OrderController::class, 'tracking']);
             Route::post('/orders/{id}/returns', [OrderController::class, 'requestReturn']);
+            Route::post('/orders/{id}/conversation', [OrderController::class, 'buyerOrderConversation']);
             Route::get('/returns', [OrderController::class, 'returns']);
             Route::post('/orders/{id}/payment-intent', [OrderController::class, 'createPaymentIntent']);
             Route::get('/orders/{id}/payment', [OrderController::class, 'paymentStatus']);
@@ -104,6 +111,7 @@ Route::prefix('v1')->group(function () {
             Route::patch('/seller/orders/{id}/status', [OrderController::class, 'updateSellerStatus']);
             Route::post('/seller/orders/{id}/conversation', [OrderController::class, 'sellerOrderConversation']);
             Route::get('/seller/returns', [OrderController::class, 'sellerReturns']);
+            Route::patch('/seller/returns/{id}/status', [OrderController::class, 'updateSellerReturnStatus']);
             Route::post('/seller/products/{product}/images', [ProductImageController::class, 'store']);
             Route::patch('/seller/products/{product}/images/{image}', [ProductImageController::class, 'update']);
             Route::delete('/seller/products/{product}/images/{image}', [ProductImageController::class, 'destroy']);

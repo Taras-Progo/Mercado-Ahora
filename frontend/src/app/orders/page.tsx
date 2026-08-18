@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { RoleGuard } from "@/components/RoleGuard";
 import { SiteFooter } from "@/components/layout/SiteFooter";
 import { SiteHeader } from "@/components/layout/SiteHeader";
 import { PaymentSummaryCard } from "@/components/payments/PaymentSummaryCard";
+import { ReturnTimeline } from "@/components/ReturnTimeline";
 import type { Order } from "@/lib/api";
 import {
+  createBuyerOrderConversation,
   deliveryTypeLabel,
   getOrders,
   money,
@@ -17,7 +20,7 @@ import {
   returnStatusColor,
   returnStatusLabel,
 } from "@/lib/api";
-import { ChevronDownIcon, PackageIcon } from "@/components/ui/Icons";
+import { ChevronDownIcon, MessageIcon, PackageIcon } from "@/components/ui/Icons";
 
 type ReturnDraft = {
   reason: string;
@@ -33,25 +36,57 @@ export default function OrdersPage() {
 }
 
 function OrdersContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const requestedOrderId = Number(searchParams.get("order"));
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [creatingConversationId, setCreatingConversationId] = useState<number | null>(null);
+  const orderRefs = useRef<Record<number, HTMLElement | null>>({});
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [returnDrafts, setReturnDrafts] = useState<Record<number, ReturnDraft>>({});
   const [submittingReturnId, setSubmittingReturnId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<Record<number, { tone: "success" | "error"; text: string }>>({});
 
   const fetchOrders = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await getOrders();
       setOrders(data);
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No se pudieron cargar tus pedidos.");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchOrders();
+    void fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    if (!requestedOrderId || !orders.some((order) => order.id === requestedOrderId)) return;
+    setExpandedIds((current) => new Set(current).add(requestedOrderId));
+    window.requestAnimationFrame(() => orderRefs.current[requestedOrderId]?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }, [orders, requestedOrderId]);
+
+  async function startConversation(orderId: number) {
+    setCreatingConversationId(orderId);
+    setFeedback((current) => ({ ...current, [orderId]: { tone: "success", text: "" } }));
+    try {
+      const conversation = await createBuyerOrderConversation(orderId);
+      router.push(`/chat?id=${conversation.id}`);
+    } catch (err) {
+      setFeedback((current) => ({
+        ...current,
+        [orderId]: { tone: "error", text: err instanceof Error ? err.message : "No se pudo abrir la conversación." },
+      }));
+    } finally {
+      setCreatingConversationId(null);
+    }
+  }
 
   const toggleExpand = (id: number) => {
     setExpandedIds((prev) => {
@@ -100,7 +135,7 @@ function OrdersContent() {
       setReturnDrafts((prev) => ({ ...prev, [orderId]: { reason: "", details: "" } }));
       setFeedback((prev) => ({
         ...prev,
-        [orderId]: { tone: "success", text: "Solicitud enviada. Administración revisará la devolución." },
+        [orderId]: { tone: "success", text: "Solicitud enviada. El vendedor ya puede revisar la devolución." },
       }));
     } catch (err) {
       setFeedback((prev) => ({
@@ -140,7 +175,12 @@ function OrdersContent() {
             </Link>
           </div>
 
-          {orders.length === 0 ? (
+          {error ? (
+            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              <p>{error}</p>
+              <button type="button" onClick={() => void fetchOrders()} className="mt-2 font-semibold underline">Reintentar</button>
+            </div>
+          ) : orders.length === 0 ? (
             <div className="mt-12 text-center">
               <PackageIcon className="mx-auto h-12 w-12 text-stone-300" />
               <p className="mt-4 text-sm text-stone-500">Todavía no tenés pedidos.</p>
@@ -156,7 +196,7 @@ function OrdersContent() {
               {orders.map((order) => {
                 const isExpanded = expandedIds.has(order.id);
                 return (
-                  <article key={order.id} className="overflow-hidden rounded-2xl border border-border-soft bg-white">
+                  <article ref={(node) => { orderRefs.current[order.id] = node; }} key={order.id} className="scroll-mt-24 overflow-hidden rounded-2xl border border-border-soft bg-white">
                     <button
                       type="button"
                       onClick={() => toggleExpand(order.id)}
@@ -195,6 +235,8 @@ function OrdersContent() {
                         submittingReturn={submittingReturnId === order.id}
                         onDraftChange={(field, value) => updateDraft(order.id, field, value)}
                         onSubmitReturn={() => submitReturn(order.id)}
+                        onStartConversation={() => startConversation(order.id)}
+                        creatingConversation={creatingConversationId === order.id}
                       />
                     )}
                   </article>
@@ -216,6 +258,8 @@ function OrderDetails({
   submittingReturn,
   onDraftChange,
   onSubmitReturn,
+  onStartConversation,
+  creatingConversation,
 }: {
   order: Order;
   draft?: ReturnDraft;
@@ -223,6 +267,8 @@ function OrderDetails({
   submittingReturn: boolean;
   onDraftChange: (field: keyof ReturnDraft, value: string) => void;
   onSubmitReturn: () => void;
+  onStartConversation: () => void;
+  creatingConversation: boolean;
 }) {
   const returnRequest = order.return_requests?.[0];
   const canRequestReturn = order.status === "delivered" && !returnRequest;
@@ -262,6 +308,22 @@ function OrderDetails({
         </div>
       )}
 
+      <div className="mt-3 flex flex-col gap-3 rounded-lg border border-border-soft bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-foreground">¿Necesitás coordinar la entrega?</p>
+          <p className="text-xs text-brown-muted">Escribile al vendedor en la conversación vinculada a este pedido.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onStartConversation}
+          disabled={creatingConversation}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-full border border-olive px-4 py-2 text-sm font-semibold text-olive-dark transition hover:bg-olive-muted disabled:opacity-50"
+        >
+          <MessageIcon className="h-4 w-4" />
+          {creatingConversation ? "Abriendo chat..." : "Escribir al vendedor"}
+        </button>
+      </div>
+
       {order.status_history && order.status_history.length > 0 && (
         <div className="mt-3 rounded-lg border border-border-soft bg-white p-3">
           <p className="mb-2 text-xs font-medium text-foreground">Historial de estados</p>
@@ -295,6 +357,7 @@ function OrderDetails({
             </span>
             <p className="mt-2 text-sm font-medium text-foreground">{returnRequest.reason}</p>
             {returnRequest.details && <p className="mt-1 text-xs text-brown-muted">{returnRequest.details}</p>}
+            <ReturnTimeline history={returnRequest.status_history} />
           </div>
         ) : canRequestReturn ? (
           <div className="mt-3 grid gap-3">

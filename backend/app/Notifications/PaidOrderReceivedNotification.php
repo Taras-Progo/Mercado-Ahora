@@ -17,8 +17,20 @@ class PaidOrderReceivedNotification extends Notification implements ShouldQueue
         $this->afterCommit();
     }
 
-    public function via(object $notifiable): array { return ['mail']; }
+    public function via(object $notifiable): array { return ['mail', 'database']; }
 
+    public function toArray(object $notifiable): array
+    {
+        $order = Order::query()->findOrFail($this->orderId);
+
+        return [
+            'kind' => 'paid_sale',
+            'title' => 'Realizaste una nueva venta',
+            'message' => 'Mercado Pago confirmó el pago del pedido '.$order->order_number.'.',
+            'url' => '/seller/orders?order='.$order->id,
+            'order_id' => $order->id,
+        ];
+    }
     public function toMail(object $notifiable): MailMessage
     {
         $order = Order::query()->findOrFail($this->orderId);

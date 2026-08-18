@@ -82,12 +82,12 @@ export function ProducerDashboard() {
           .filter((o) => o.status === "delivered")
           .reduce((sum, o) => sum + (o.total_cents ?? 0), 0),
       ),
-      helper: "Pedidos entregados",
+      helper: "Ventas entregadas",
       helperColor: "text-emerald-700",
       icon: TrendingUpIcon,
     },
     {
-      title: "Pedidos activos",
+      title: "Ventas activas",
       value: String(pendingOrders),
       helper: pendingOrders === 1 ? "por preparar" : "por preparar",
       helperColor: "text-amber-700",
@@ -139,9 +139,9 @@ export function ProducerDashboard() {
         </div>
 
         <div className="grid gap-6 xl:grid-cols-3">
-          <DashboardCard title="Pedidos recientes" action={{ label: "Ver todos", href: "/seller/orders" }}>
+          <DashboardCard title="Ventas recientes" action={{ label: "Ver todos", href: "/seller/orders" }}>
             {recentOrders.length === 0 ? (
-              <p className="py-4 text-sm text-stone-500">Todavía no recibiste pedidos.</p>
+              <p className="py-4 text-sm text-stone-500">Todavía no recibiste ventas.</p>
             ) : (
               <ul className="grid divide-y divide-border-soft">
                 {recentOrders.map((order) => {
@@ -255,7 +255,7 @@ export function ProducerDashboard() {
 function Sidebar({ pendingOrders, profileCompletion }: { pendingOrders: number; profileCompletion: number }) {
   const sidebarItems: SidebarItem[] = [
     { label: "Resumen", icon: TrendingUpIcon, href: "/seller", active: true },
-    { label: "Pedidos", icon: PackageIcon, href: "/seller/orders", badge: pendingOrders || undefined },
+    { label: "Ventas", icon: PackageIcon, href: "/seller/orders", badge: pendingOrders || undefined },
     { label: "Productos", icon: BagIcon, href: "/seller/products" },
     { label: "Mensajes", icon: MessageIcon, href: "/chat" },
     { label: "Devoluciones", icon: PackageIcon, href: "/seller/returns" },
@@ -528,7 +528,7 @@ function SalesChart() {
       <div className="mt-5 grid h-40 place-items-center rounded-xl border border-dashed border-border-soft bg-cream-card px-5 text-center">
         <div>
           <p className="text-sm font-semibold text-stone-700">Sin ventas registradas</p>
-          <p className="mt-1 text-xs text-stone-500">Las estadisticas reales apareceran cuando haya pedidos entregados.</p>
+          <p className="mt-1 text-xs text-stone-500">Las estadisticas reales apareceran cuando haya ventas entregadas.</p>
         </div>
       </div>
     </section>
@@ -658,17 +658,17 @@ function PendingOrdersBanner({ pendingOrders }: { pendingOrders: number }) {
         <div>
           <p className="text-sm font-semibold text-amber-900">
             {pendingOrders > 0
-              ? `Tenés ${pendingOrders} ${pendingOrders === 1 ? "pedido" : "pedidos"} para preparar`
-              : "No tenés pedidos pendientes"}
+              ? `Tenés ${pendingOrders} ${pendingOrders === 1 ? "venta" : "ventas"} para preparar`
+              : "No tenés ventas pendientes"}
           </p>
-          <p className="text-xs text-amber-800">Ingresá a la sección de pedidos para ver los detalles.</p>
+          <p className="text-xs text-amber-800">Ingresá a la sección de ventas para ver los detalles.</p>
         </div>
       </div>
       <Link
         href="/seller/orders"
         className="inline-flex shrink-0 items-center justify-center rounded-full bg-amber-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-amber-700"
       >
-        Ir a pedidos
+        Ir a ventas
       </Link>
     </div>
   );

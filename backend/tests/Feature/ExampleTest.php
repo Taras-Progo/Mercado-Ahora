@@ -1526,6 +1526,21 @@ class ExampleTest extends TestCase
 
         $this->actingAs($admin, 'sanctum')
             ->patchJson("/api/v1/admin/returns/{$return->id}/status", ['status' => 'completed'])
+            ->assertUnprocessable();
+
+        $this->actingAs($admin, 'sanctum')
+            ->patchJson("/api/v1/admin/returns/{$return->id}/status", [
+                'status' => 'approved',
+                'note' => 'Devolución aceptada para revisión final.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'approved');
+
+        $this->actingAs($admin, 'sanctum')
+            ->patchJson("/api/v1/admin/returns/{$return->id}/status", [
+                'status' => 'completed',
+                'note' => 'Devolución recibida y cerrada.',
+            ])
             ->assertOk()
             ->assertJsonPath('data.status', 'completed')
             ->assertJsonPath('data.order.status', 'returned');
@@ -1538,6 +1553,16 @@ class ExampleTest extends TestCase
             'order_id' => $orderId,
             'changed_by' => $admin->id,
             'status' => 'returned',
+        ]);
+        $this->assertDatabaseHas('return_status_histories', [
+            'return_request_id' => $return->id,
+            'changed_by' => $admin->id,
+            'status' => 'approved',
+        ]);
+        $this->assertDatabaseHas('return_status_histories', [
+            'return_request_id' => $return->id,
+            'changed_by' => $admin->id,
+            'status' => 'completed',
         ]);
     }
 

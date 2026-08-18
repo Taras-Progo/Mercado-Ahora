@@ -10,10 +10,12 @@ use App\Models\ProductModerationNote;
 use App\Models\ProducerProfile;
 use App\Models\ReturnRequest;
 use App\Models\User;
+use App\Notifications\MarketplaceInAppNotification;
 use App\Notifications\ProductModerationNoteNotification;
 use App\Services\Payments\PaymentSummaryService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -382,7 +384,7 @@ class AdminController extends Controller
     {
         return response()->json([
             'data' => ReturnRequest::query()
-                ->with('buyer', 'order.items.product', 'order.statusHistory')
+                ->with('buyer', 'order.items.product.producerProfile.user', 'order.statusHistory', 'statusHistory.changedBy')
                 ->latest()
                 ->get(),
         ]);
@@ -390,25 +392,94 @@ class AdminController extends Controller
 
     public function updateReturnStatus(Request $request, int $id): JsonResponse
     {
-        $data = $request->validate(['status' => ['required', 'string', Rule::in(['open', 'approved', 'rejected', 'completed'])]]);
-        $return = ReturnRequest::query()->with('order')->findOrFail($id);
-        $return->update($data);
-        $this->audit($request, 'admin.return.status_updated', $return, ['status' => $data['status']]);
+        $data = $request->validate([
+            'status' => ['required', 'string', Rule::in(['approved', 'rejected', 'completed'])],
+            'note' => ['nullable', 'string', 'max:1000'],
+        ]);
 
-        if ($data['status'] === 'completed' && $return->order && $return->order->status !== 'returned') {
-            $return->order->update(['status' => 'returned']);
-            $return->order->statusHistory()->create([
+        $return = DB::transaction(function () use ($request, $id, $data) {
+            $return = ReturnRequest::query()
+                ->with(['buyer', 'order.items.producerProfile.user'])
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            $allowed = match ($return->status) {
+                'open' => ['approved', 'rejected'],
+                'approved' => ['completed'],
+                default => [],
+            };
+
+            if (! in_array($data['status'], $allowed, true)) {
+                abort(422, 'La transición solicitada no es válida para el estado actual de la devolución.');
+            }
+
+            $previous = $return->status;
+            $return->update(['status' => $data['status']]);
+            $return->statusHistory()->create([
                 'changed_by' => $request->user()->id,
-                'status' => 'returned',
-                'note' => 'Devolución completada por administración.',
+                'status' => $data['status'],
+                'note' => $data['note'] ?? null,
             ]);
-        }
+
+            if ($data['status'] === 'completed' && $return->order && $return->order->status !== 'returned') {
+                $return->order->update(['status' => 'returned']);
+                $return->order->statusHistory()->create([
+                    'changed_by' => $request->user()->id,
+                    'status' => 'returned',
+                    'note' => 'Devolución completada por administración.',
+                ]);
+            }
+
+            $this->audit($request, 'admin.return.status_updated', $return, [
+                'from' => $previous,
+                'to' => $data['status'],
+                'note' => $data['note'] ?? null,
+            ]);
+
+            DB::afterCommit(function () use ($return, $data) {
+                $copy = match ($data['status']) {
+                    'approved' => ['Tu devolución fue aceptada', 'La solicitud fue aceptada y queda pendiente de cierre administrativo.'],
+                    'rejected' => ['Tu devolución fue rechazada', 'La solicitud fue rechazada. Revisá el detalle para conocer la decisión.'],
+                    default => ['Tu devolución fue completada', 'Administración completó la devolución y el pedido figura como devuelto.'],
+                };
+
+                $return->buyer?->notify(new MarketplaceInAppNotification(
+                    'return_'.$data['status'],
+                    $copy[0],
+                    $copy[1],
+                    '/returns?return='.$return->id,
+                    ['return_id' => $return->id, 'order_id' => $return->order_id],
+                ));
+
+                if ($data['status'] === 'completed') {
+                    $producerUsers = $return->order->items
+                        ->map(fn ($item) => $item->producerProfile?->user)
+                        ->filter()
+                        ->unique('id');
+                    foreach ($producerUsers as $producer) {
+                        $producer->notify(new MarketplaceInAppNotification(
+                            'return_completed',
+                            'Devolución completada',
+                            'Administración completó la devolución del pedido '.$return->order->order_number.'.',
+                            '/seller/returns?return='.$return->id,
+                            ['return_id' => $return->id, 'order_id' => $return->order_id],
+                        ));
+                    }
+                }
+            });
+
+            return $return;
+        });
 
         return response()->json([
-            'data' => $return->load('buyer', 'order.items.product', 'order.statusHistory'),
+            'data' => $return->load(
+                'buyer',
+                'order.items.product.producerProfile.user',
+                'order.statusHistory',
+                'statusHistory.changedBy',
+            ),
         ]);
     }
-
     private function loadAdminProduct(Product $product): Product
     {
         return $product->load(['producerProfile.user', 'category', 'images', 'moderationNotes.admin']);

@@ -63,7 +63,7 @@ function SellerOrdersView() {
       setOrders(data);
       setError("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar los pedidos.");
+      setError(err instanceof Error ? err.message : "Error al cargar las ventas.");
     } finally {
       setLoading(false);
     }
@@ -150,7 +150,7 @@ function SellerOrdersView() {
         const conversation = await createSellerOrderConversation(orderId);
         router.push(`/chat?id=${conversation.id}`);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "No se pudo abrir el chat del pedido.");
+        setError(err instanceof Error ? err.message : "No se pudo abrir el chat de la venta.");
       } finally {
         setCreatingConversationId(null);
       }
@@ -159,21 +159,30 @@ function SellerOrdersView() {
   );
 
   if (loading) {
-    return <div className="py-16 text-center text-sm text-stone-500">Cargando pedidos...</div>;
+    return <div className="py-16 text-center text-sm text-stone-500">Cargando ventas...</div>;
   }
 
   return (
     <div>
       <SellerBackLink className="mb-6" />
       <div className="mb-6">
-        <h1 className="font-serif text-2xl font-bold text-stone-900">Pedidos recibidos</h1>
+        <h1 className="font-serif text-2xl font-bold text-stone-900">Mis ventas</h1>
         <p className="mt-1 text-sm text-stone-600">
-          Gestioná los pedidos de tus productos y actualizá su estado de entrega.
+          Gestioná las compras de tus productos y actualizá su estado de entrega.
         </p>
       </div>
 
       {error && (
-        <div className="mb-4 rounded-full bg-red-50 px-4 py-2 text-center text-sm text-red-700">{error}</div>
+        <div className="mb-4 flex flex-wrap items-center justify-center gap-3 rounded-lg bg-red-50 px-4 py-3 text-center text-sm text-red-700">
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={fetchOrders}
+            className="font-semibold underline underline-offset-2"
+          >
+            Reintentar
+          </button>
+        </div>
       )}
 
       {success && (
@@ -186,9 +195,9 @@ function SellerOrdersView() {
       {orders.length === 0 ? (
         <div className="mt-12 rounded-2xl border border-border-soft bg-white p-12 text-center">
           <PackageIcon className="mx-auto h-12 w-12 text-stone-300" />
-          <h3 className="mt-4 text-lg font-semibold text-stone-700">Todavía no tenés pedidos</h3>
+          <h3 className="mt-4 text-lg font-semibold text-stone-700">Todavía no tenés ventas</h3>
           <p className="mt-1 text-sm text-stone-500">
-            Cuando un comprador realice un pedido de tus productos, aparecerá acá.
+            Cuando un comprador complete una compra de tus productos, aparecerá acá.
           </p>
         </div>
       ) : (
@@ -291,7 +300,7 @@ function SellerOrdersView() {
                           <div>
                             <p className="text-sm font-semibold text-foreground">Comunicación con el comprador</p>
                             <p className="text-xs text-brown-muted">
-                              Usá este chat para coordinar entrega, consultas y detalles del pedido.
+                              Usá este chat para coordinar entrega, consultas y detalles de la venta.
                             </p>
                           </div>
                           <button
@@ -319,7 +328,7 @@ function SellerOrdersView() {
                                   </div>
                                   <p className="mt-2 font-medium text-foreground">{request.reason}</p>
                                   {request.details && <p className="mt-1 text-xs text-brown-muted">{request.details}</p>}
-                                  <Link href="/seller/returns" className="mt-2 inline-block text-xs font-semibold text-olive-dark hover:underline">
+                                  <Link href={`/seller/returns?return=${request.id}`} className="mt-2 inline-block text-xs font-semibold text-olive-dark hover:underline">
                                     Ver devoluciones
                                   </Link>
                                 </div>

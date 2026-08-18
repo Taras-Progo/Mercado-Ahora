@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Logo } from "@/components/ui/Logo";
-import { CartIcon, ChevronDownIcon, HeartIcon, MessageIcon, SearchIcon } from "@/components/ui/Icons";
+import { BellIcon, CartIcon, ChevronDownIcon, HeartIcon, MessageIcon, SearchIcon } from "@/components/ui/Icons";
 import { useAuth } from "@/components/AuthProvider";
 import { useFavorites } from "@/components/FavoritesProvider";
-import type { Cart, Conversation } from "@/lib/api";
-import { ApiError, getCart, getConversationSummary, money } from "@/lib/api";
+import type { AppNotification, Cart, Conversation } from "@/lib/api";
+import { ApiError, getCart, getConversationSummary, getNotificationSummary, markAllNotificationsRead, markNotificationRead, money } from "@/lib/api";
 
 type NavItem = { label: string; href: string };
 
@@ -30,11 +30,13 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
   const { user, ready, logout } = useAuth();
   const { favoriteCount } = useFavorites();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [openPanel, setOpenPanel] = useState<"messages" | "cart" | null>(null);
+  const [openPanel, setOpenPanel] = useState<"messages" | "notifications" | "cart" | null>(null);
   const [cartCount, setCartCount] = useState(0);
   const [messageCount, setMessageCount] = useState(0);
+  const [notificationCount, setNotificationCount] = useState(0);
   const [cart, setCart] = useState<Cart | null>(null);
   const [messagePreview, setMessagePreview] = useState<Conversation[]>([]);
+  const [notificationPreview, setNotificationPreview] = useState<AppNotification[]>([]);
   const panelsRef = useRef<HTMLDivElement>(null);
 
   const transparent = variant === "transparent";
@@ -89,6 +91,59 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
       cancelled = true;
     };
   }, [logout, ready, user]);
+
+  useEffect(() => {
+    if (!ready || !user) return;
+
+    let cancelled = false;
+
+    async function refreshNotifications() {
+      try {
+        const summary = await getNotificationSummary(4);
+        if (cancelled) return;
+        setNotificationCount(summary.unread_count);
+        setNotificationPreview(summary.notifications);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          await logout();
+        }
+      }
+    }
+
+    void refreshNotifications();
+    const intervalId = window.setInterval(refreshNotifications, 30_000);
+    const handleFocus = () => void refreshNotifications();
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void refreshNotifications();
+    };
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [logout, ready, user]);
+
+  async function openNotification(notification: AppNotification) {
+    if (!notification.read_at) {
+      await markNotificationRead(notification.id);
+      setNotificationCount((count) => Math.max(0, count - 1));
+      setNotificationPreview((items) =>
+        items.map((item) => (item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item)),
+      );
+    }
+    setOpenPanel(null);
+    router.push(notification.data.url || "/notificaciones");
+  }
+
+  async function readAllNotifications() {
+    await markAllNotificationsRead();
+    setNotificationCount(0);
+    setNotificationPreview((items) => items.map((item) => ({ ...item, read_at: item.read_at || new Date().toISOString() })));
+  }
 
   useEffect(() => {
     if (!openPanel) return;
@@ -166,7 +221,18 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
               <MessageIcon className="h-5 w-5" />
             </HeaderIconButton>
           ) : null}
-          {/* Favorites stays secondary on very small screens; messages and cart remain one tap away. */}
+          {ready && user ? (
+            <HeaderIconButton
+              transparent={transparent}
+              ariaLabel="Notificaciones"
+              badge={notificationCount > 0 ? notificationCount : undefined}
+              expanded={openPanel === "notifications"}
+              onClick={() => setOpenPanel((current) => (current === "notifications" ? null : "notifications"))}
+            >
+              <BellIcon className="h-5 w-5" />
+            </HeaderIconButton>
+          ) : null}
+          {/* Favorites stays secondary on very small screens; messages, notifications and cart remain one tap away. */}
           <span className="hidden items-center gap-1 sm:flex sm:gap-2">
             <IconButton transparent={transparent} ariaLabel="Favoritos" href="/favoritos" badge={user && favoriteCount > 0 ? favoriteCount : undefined}>
               <HeartIcon className="h-5 w-5" />
@@ -186,6 +252,16 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
             <MessagesPreviewPanel
               conversations={messagePreview}
               userRole={user.role}
+              onNavigate={() => setOpenPanel(null)}
+            />
+          )}
+
+          {ready && user && openPanel === "notifications" && (
+            <NotificationsPreviewPanel
+              notifications={notificationPreview}
+              unreadCount={notificationCount}
+              onOpen={openNotification}
+              onReadAll={readAllNotifications}
               onNavigate={() => setOpenPanel(null)}
             />
           )}
@@ -296,8 +372,8 @@ export function SiteHeader({ variant = "default" }: SiteHeaderProps) {
                       Panel administrador
                     </MobileLink>
                   )}
-                  <MobileLink href="/orders" onClick={() => setMenuOpen(false)}>
-                    Mis pedidos
+                  <MobileLink href={user.role === "seller" ? "/seller/orders" : "/orders"} onClick={() => setMenuOpen(false)}>
+                    {user.role === "seller" ? "Mis ventas" : "Mis pedidos"}
                   </MobileLink>
                   <MobileLink href="/chat" onClick={() => setMenuOpen(false)}>
                     Mensajes
@@ -484,6 +560,66 @@ function MessagesPreviewPanel({
   );
 }
 
+function NotificationsPreviewPanel({
+  notifications,
+  unreadCount,
+  onOpen,
+  onReadAll,
+  onNavigate,
+}: {
+  notifications: AppNotification[];
+  unreadCount: number;
+  onOpen: (notification: AppNotification) => Promise<void>;
+  onReadAll: () => Promise<void>;
+  onNavigate: () => void;
+}) {
+  return (
+    <div className="absolute right-0 top-full z-50 mt-3 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border-soft bg-white text-foreground shadow-xl">
+      <div className="flex items-center justify-between gap-3 border-b border-border-soft bg-cream-card px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-stone-900">Notificaciones</p>
+          <p className="text-xs text-stone-500">{unreadCount ? `${unreadCount} sin leer` : "Todo está al día"}</p>
+        </div>
+        {unreadCount > 0 && (
+          <button type="button" onClick={() => void onReadAll()} className="text-xs font-semibold text-olive-dark hover:underline">
+            Marcar todas como leídas
+          </button>
+        )}
+      </div>
+      {notifications.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-stone-500">No tenés notificaciones recientes.</div>
+      ) : (
+        <div className="max-h-80 overflow-y-auto">
+          {notifications.map((notification) => (
+            <button
+              key={notification.id}
+              type="button"
+              onClick={() => void onOpen(notification)}
+              className={`block w-full border-b border-border-soft px-4 py-3 text-left transition last:border-b-0 hover:bg-olive-muted ${notification.read_at ? "bg-white" : "bg-emerald-50/60"}`}
+            >
+              <span className="flex items-start gap-3">
+                <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.read_at ? "bg-stone-300" : "bg-olive"}`} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-stone-900">{notification.data.title}</span>
+                  <span className="mt-0.5 block text-xs leading-5 text-stone-600">{notification.data.message}</span>
+                  <span className="mt-1 block text-[11px] text-stone-400">{relativeTime(notification.created_at)}</span>
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+      <Link
+        href="/notificaciones"
+        onClick={onNavigate}
+        className="block border-t border-border-soft px-4 py-3 text-center text-sm font-semibold text-olive-dark transition hover:bg-cream-card"
+      >
+        Ver todas las notificaciones
+      </Link>
+    </div>
+  );
+}
+
 function CartPreviewPanel({ cart, onNavigate }: { cart: Cart | null; onNavigate: () => void }) {
   const items = cart?.items ?? [];
   const subtotal = items.reduce(
@@ -630,8 +766,8 @@ function UserMenu({
               Panel administrador
             </Link>
           )}
-          <Link className="px-4 py-2 hover:bg-olive-muted" href="/orders">
-            Mis pedidos
+          <Link className="px-4 py-2 hover:bg-olive-muted" href={role === "seller" ? "/seller/orders" : "/orders"}>
+            {role === "seller" ? "Mis ventas" : "Mis pedidos"}
           </Link>
           <Link className="px-4 py-2 hover:bg-olive-muted" href="/favoritos">
             Favoritos{favoriteCount > 0 ? ` (${favoriteCount})` : ""}
