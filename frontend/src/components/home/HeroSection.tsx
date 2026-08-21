@@ -1,20 +1,6 @@
 import { HandshakeIcon, LeafIcon, SearchIcon, ShieldCheckIcon } from "@/components/ui/Icons";
 
-const HERO_IMAGE =
-  "https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=2000&q=85";
-
-const HERO_BACKGROUND = `
-  linear-gradient(
-    to right,
-    #f2ebe1 0%,
-    #f2ebe1 22%,
-    rgba(242, 235, 225, 0.98) 38%,
-    rgba(242, 235, 225, 0.78) 48%,
-    rgba(242, 235, 225, 0.3) 60%,
-    rgba(242, 235, 225, 0) 75%
-  ),
-  url('${HERO_IMAGE}')
-`;
+const HERO_IMAGE = "/images/home-market-hero.jpg";
 
 const valueProps = [
   {
@@ -37,25 +23,25 @@ const valueProps = [
 export function HeroSection() {
   return (
     <section
-      className="relative min-h-[420px] overflow-hidden bg-cream bg-cover bg-[72%_center] bg-no-repeat sm:min-h-[480px] sm:bg-[center_right] lg:min-h-[540px]"
-      style={{ backgroundImage: HERO_BACKGROUND }}
+      className="relative min-h-[500px] overflow-hidden bg-olive-dark bg-cover bg-[58%_center] bg-no-repeat sm:min-h-[520px] sm:bg-[55%_center] lg:min-h-[540px] lg:bg-center"
+      style={{ backgroundImage: `url('${HERO_IMAGE}')` }}
     >
       <div
-        className="absolute inset-0 bg-[linear-gradient(105deg,#f6efe4_0%,rgba(246,239,228,0.98)_38%,rgba(246,239,228,0.9)_62%,rgba(246,239,228,0.68)_100%)] backdrop-blur-[1.5px] sm:hidden"
+        className="absolute inset-0 bg-[linear-gradient(90deg,rgba(20,27,17,0.92)_0%,rgba(20,27,17,0.8)_38%,rgba(20,27,17,0.38)_68%,rgba(20,27,17,0.12)_100%)]"
         aria-hidden
       />
       <div
-        className="absolute inset-0 bg-[radial-gradient(circle_at_0%_20%,rgba(255,253,248,0.96)_0%,rgba(255,253,248,0.82)_42%,rgba(255,253,248,0)_78%)] sm:hidden"
+        className="absolute inset-0 bg-[linear-gradient(180deg,rgba(14,20,12,0.12)_0%,rgba(14,20,12,0.3)_58%,rgba(14,20,12,0.72)_100%)] sm:hidden"
         aria-hidden
       />
       <div className="relative z-10 mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-10 lg:py-16">
         <div className="max-w-xl lg:max-w-[48%]">
-          <h1 className="font-serif text-4xl leading-[1.15] tracking-tight text-foreground sm:text-5xl lg:text-[3.25rem]">
+          <h1 className="font-serif text-4xl leading-[1.15] tracking-tight text-white sm:text-5xl lg:text-[3.25rem]">
             Conectamos personas
             <br />
-            con <span className="text-accent-green">productos reales</span>
+            con <span className="text-[#b8d6a2]">productos reales</span>
           </h1>
-          <p className="mt-5 max-w-lg text-base leading-relaxed text-brown-muted sm:text-lg">
+          <p className="mt-5 max-w-lg text-base leading-relaxed text-white/90 sm:text-lg">
             Apoyá a productores locales, elegí natural, elegí consciente.
           </p>
 
@@ -81,10 +67,10 @@ export function HeroSection() {
 
           <ul className="mt-10 grid max-w-2xl gap-6 sm:grid-cols-3 sm:gap-4">
             {valueProps.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="flex items-start gap-2.5 text-sm text-brown-muted">
-                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-brown" aria-hidden />
+              <li key={title} className="flex items-start gap-2.5 text-sm text-white/80">
+                <Icon className="mt-0.5 h-5 w-5 shrink-0 text-[#b8d6a2]" aria-hidden />
                 <p className="leading-snug">
-                  <span className="block font-semibold text-brown">{title}</span>
+                  <span className="block font-semibold text-white">{title}</span>
                   <span>{text}</span>
                 </p>
               </li>
